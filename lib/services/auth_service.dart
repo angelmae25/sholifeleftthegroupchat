@@ -16,7 +16,7 @@ class AuthService {
   static final AuthService instance = AuthService._();
 
   // ── Flask base URL ─────────────────────────────────────────────────────────
-  static const String _base = 'http://192.168.1.26:5000/api/mobile';
+  static const String _base = 'http://192.168.1.11:5000/api/mobile';
 
   static const _kToken      = 'jwt_token';
   static const _kUserId     = 'user_id';

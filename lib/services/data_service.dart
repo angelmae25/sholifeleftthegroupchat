@@ -19,7 +19,7 @@ import '../models/user_model.dart';
 import 'auth_service.dart';
 
 // ── Base URL ─────────────────────────────────────────────────────────────────
-const String _base = 'http://192.168.1.26:5000/api/mobile';
+const String _base = 'http://192.168.1.11:5000/api/mobile';
 
 // ── JWT Auth header ───────────────────────────────────────────────────────────
 Future<Map<String, String>> _headers() async {
