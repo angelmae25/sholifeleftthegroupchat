@@ -113,110 +113,162 @@ class _HomeViewState extends State<HomeView> {
 // ─────────────────────────────────────────────────────────────────────────────
 class NewsView extends StatefulWidget {
   const NewsView({super.key});
+
   @override
   State<NewsView> createState() => _NewsViewState();
 }
 
 class _NewsViewState extends State<NewsView> {
+
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+
       context.read<NewsController>().loadArticles();
-      final studentId = context.read<AuthController>().user?.studentId ?? '';
+
+      final studentId =
+          context.read<AuthController>().user?.studentId ?? '';
+
       context.read<OrgPostController>().loadMyOrganizations(studentId);
+
     });
   }
 
   @override
   Widget build(BuildContext context) {
+
     final cardClr = AppTheme.cardColor(context);
     final pageClr = AppTheme.pageColor(context);
     final textSubClr = AppTheme.textSub(context);
     final borderClr = AppTheme.borderCol(context);
 
     return Consumer2<OrgPostController, NewsController>(
-      builder: (_, orgCtrl, newsCtrl, __) {
+      builder: (context, orgCtrl, newsCtrl, child) {
+
         final hasRole = orgCtrl.hasOrgs;
+
         return Scaffold(
           backgroundColor: pageClr,
+
           appBar: AppBar(
             backgroundColor: AppTheme.primary,
             foregroundColor: Colors.white,
-            leading: Builder(builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-            )),
-            title: Image.asset('assets/images/splash_logo.png', height: 30, fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Text('SchoLife',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
-            actions: [
-              IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: GestureDetector(
-                  onTap: () => context.push('/profile'),
-                  child: const CircleAvatar(radius: 16, backgroundColor: AppTheme.accentLight,
-                      child: Icon(Icons.person, size: 18, color: AppTheme.primaryDark)),
-                ),
+            leading: Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
               ),
-            ],
+            ),
+            title: const Text("SchoLife"),
           ),
+
           drawer: _buildDrawer(context, '/news'),
+
           floatingActionButton: hasRole
               ? FloatingActionButton.extended(
             heroTag: 'news_fab',
-            onPressed: () => context.push('/create-post', extra: 'news'),
+            onPressed: () =>
+                context.push('/create-post', extra: 'news'),
             backgroundColor: AppTheme.primary,
             icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Post News', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            label: const Text(
+              'Post News',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700),
+            ),
           )
               : null,
-          body: Column(children: [
-            if (hasRole) _OrgRoleBanner(orgCtrl: orgCtrl),
-            Container(
-              color: cardClr,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Row(
-                  children: NewsCategory.values.map((cat) {
-                    final isActive = newsCtrl.activeCategory == cat;
-                    return GestureDetector(
-                      onTap: () => newsCtrl.setCategory(cat),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: isActive ? AppTheme.primary : pageClr,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: isActive ? AppTheme.primary : borderClr),
+
+          body: Column(
+            children: [
+
+              if (hasRole)
+                _OrgRoleBanner(orgCtrl: orgCtrl),
+
+              Container(
+                color: cardClr,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: NewsCategory.values.map((cat) {
+
+                      final isActive =
+                          newsCtrl.activeCategory == cat;
+
+                      return GestureDetector(
+                        onTap: () =>
+                            newsCtrl.setCategory(cat),
+
+                        child: AnimatedContainer(
+                          duration:
+                          const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.only(right: 8),
+
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 7),
+
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppTheme.primary
+                                : pageClr,
+                            borderRadius:
+                            BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isActive
+                                  ? AppTheme.primary
+                                  : borderClr,
+                            ),
+                          ),
+
+                          child: Text(
+                            cat.label,
+                            style: TextStyle(
+                              color: isActive
+                                  ? Colors.white
+                                  : textSubClr,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                        child: Text(cat.label, style: TextStyle(
-                          color: isActive ? Colors.white : textSubClr,
-                          fontSize: 13, fontWeight: FontWeight.w600,
-                        )),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
-            ),
-            if (newsCtrl.isLoading)
-              const Expanded(child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
-            else
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 80),
-                  itemCount: newsCtrl.filteredArticles.length,
-                  itemBuilder: (_, i) {
-                    final a = newsCtrl.filteredArticles[i];
-                    return a.isFeatured ? _FeaturedNewsCard(article: a) : _NewsCard(article: a);
-                  },
+
+              if (newsCtrl.isLoading)
+                const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primary),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    padding:
+                    const EdgeInsets.fromLTRB(14, 14, 14, 80),
+                    itemCount:
+                    newsCtrl.filteredArticles.length,
+                    itemBuilder: (_, i) {
+
+                      final article =
+                      newsCtrl.filteredArticles[i];
+
+                      return article.isFeatured
+                          ? _FeaturedNewsCard(article: article)
+                          : _NewsCard(article: article);
+                    },
+                  ),
                 ),
-              ),
-          ]),
+            ],
+          ),
         );
       },
     );
@@ -248,7 +300,7 @@ class _EventsViewState extends State<EventsView> {
     final pageClr = AppTheme.pageColor(context);
     return Consumer2<OrgPostController, EventsController>(
       builder: (_, orgCtrl, evCtrl, __) {
-        final hasRole = orgCtrl.hasOrgs;
+        final hasRole = true;
         return Scaffold(
           backgroundColor: pageClr,
           appBar: AppBar(

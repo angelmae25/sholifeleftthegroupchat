@@ -20,6 +20,7 @@ import 'views/secondary_views.dart';
 import 'views/create_post_view.dart';
 import 'views/sell_item_view.dart';
 import 'views/report_lost_found_view.dart';
+import 'views/edit_profile_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,7 @@ final _router = GoRouter(
     GoRoute(path: '/leaderboard',    builder: (_, __) => const LeaderboardView()),
     GoRoute(path: '/profile',        builder: (_, __) => const ProfileView()),
     GoRoute(path: '/settings',       builder: (_, __) => const SettingsView()),
+    
 
     // ── Create Post route (for org-assigned students) ──────────────────────
     GoRoute(

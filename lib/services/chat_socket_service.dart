@@ -52,7 +52,7 @@ class ChatSocketService {
 
     try {
       _socket = IO.io(
-        'http://192.168.1.26:5000',   // ← same IP as your Flask server
+        'http://192.168.1.11:5000',   // ← same IP as your Flask server
         IO.OptionBuilder()
             .setTransports(['websocket'])
             .setAuth({'token': token})

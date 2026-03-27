@@ -1,19 +1,12 @@
-// FILE PATH: lib/services/org_post_service.dart
-//
-// ⚠️  Update _springBootBase with your PC's current WiFi IP.
-//    Run `ipconfig` on Windows → IPv4 Address under your WiFi adapter.
-//    Keep port 8080 (Spring Boot).
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-// ── Change IP here to match your PC's WiFi IP ────────────────────────────────
-const String _springBootBase = 'http://192.168.1.26:8080/api/org-post';
+// IMPORTANT: must match your PC IPv4
+const String _springBootBase = 'http://192.168.1.11:8080/api/org-post';
 
-// ── Model: OrgAssignment ──────────────────────────────────────────────────────
 class OrgAssignment {
-  final int    assignmentId;
-  final int    organizationId;
+  final int assignmentId;
+  final int organizationId;
   final String organizationName;
   final String acronym;
   final String roleName;
@@ -26,106 +19,128 @@ class OrgAssignment {
     required this.roleName,
   });
 
-  factory OrgAssignment.fromJson(Map<String, dynamic> j) => OrgAssignment(
-    assignmentId:     (j['assignmentId']    as num).toInt(),
-    organizationId:   (j['organizationId']  as num).toInt(),
-    organizationName: j['organizationName'] as String,
-    acronym:          j['acronym']          as String? ?? '',
-    roleName:         j['roleName']         as String,
-  );
+  factory OrgAssignment.fromJson(Map<String, dynamic> j) {
+    return OrgAssignment(
+      assignmentId: (j['assignmentId'] as num).toInt(),
+      organizationId: (j['organizationId'] as num).toInt(),
+      organizationName: j['organizationName'] ?? '',
+      acronym: j['acronym'] ?? '',
+      roleName: j['roleName'] ?? '',
+    );
+  }
 }
 
-// ── OrgPostService ────────────────────────────────────────────────────────────
 class OrgPostService {
   OrgPostService._();
   static final OrgPostService instance = OrgPostService._();
 
-  // No JWT needed — Spring Boot SecurityConfig has /api/** as permitAll()
   static const Map<String, String> _headers = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json"
   };
 
+  // ─────────────────────────────────────────────
+  // FETCH ORGANIZATIONS WHERE STUDENT HAS ROLE
+  // ─────────────────────────────────────────────
   Future<List<OrgAssignment>> fetchMyOrganizations(String studentId) async {
-    try {
-      final res = await http.get(
-        Uri.parse('$_springBootBase/my-organizations?studentId=$studentId'),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 15));
+    final url = '$_springBootBase/my-organizations?studentId=$studentId';
 
-      if (res.statusCode == 200) {
-        final list = (jsonDecode(res.body) as List)
-            .cast<Map<String, dynamic>>();
-        return list.map(OrgAssignment.fromJson).toList();
+    try {
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        return data.map((e) => OrgAssignment.fromJson(e)).toList();
       }
-      throw Exception('Server returned ${res.statusCode}');
+
+      throw Exception("Server error ${response.statusCode}: ${response.body}");
     } catch (e) {
       throw Exception(
-          'Cannot connect to Spring Boot. '
-              'Check: 1) Spring Boot is running  '
-              '2) IP ${ _springBootBase} is correct  '
-              '3) Phone and PC are on same WiFi. '
-              'Details: $e'
+        "Cannot connect to Spring Boot.\n\n"
+            "Check:\n"
+            "1️⃣ Spring Boot running\n"
+            "2️⃣ Correct IP ($_springBootBase)\n"
+            "3️⃣ Same WiFi network\n\n"
+            "Error: $e",
       );
     }
   }
 
+  // ─────────────────────────────────────────────
+  // CHECK IF STUDENT CAN POST
+  // (Used to show + button)
+  // ─────────────────────────────────────────────
+  Future<bool> canStudentPost(String studentId) async {
+    final orgs = await fetchMyOrganizations(studentId);
+    return orgs.isNotEmpty;
+  }
+
+  // ─────────────────────────────────────────────
+  // POST NEWS
+  // ─────────────────────────────────────────────
   Future<void> postNews({
     required String studentId,
-    required int    organizationId,
+    required int organizationId,
     required String title,
     required String body,
     required String category,
     bool isFeatured = false,
   }) async {
-    final res = await http.post(
-      Uri.parse('$_springBootBase/news'),
+    final url = '$_springBootBase/news';
+
+    final response = await http.post(
+      Uri.parse(url),
       headers: _headers,
       body: jsonEncode({
-        'studentId':      studentId,
-        'organizationId': organizationId,
-        'title':          title,
-        'body':           body,
-        'category':       category,
-        'isFeatured':     isFeatured,
+        "studentId": studentId,
+        "organizationId": organizationId,
+        "title": title,
+        "body": body,
+        "category": category,
+        "isFeatured": isFeatured
       }),
-    ).timeout(const Duration(seconds: 15));
+    );
 
-    if (res.statusCode != 201) {
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(data['message'] ?? 'Failed to post news.');
+    if (response.statusCode != 201) {
+      throw Exception("Failed to post news: ${response.body}");
     }
   }
 
+  // ─────────────────────────────────────────────
+  // POST EVENT
+  // ─────────────────────────────────────────────
   Future<void> postEvent({
     required String studentId,
-    required int    organizationId,
+    required int organizationId,
     required String shortName,
     required String fullName,
     required String date,
     required String venue,
     required String category,
     required String description,
-    String color = '#8B1A1A',
+    String color = "#8B1A1A",
   }) async {
-    final res = await http.post(
-      Uri.parse('$_springBootBase/events'),
+    final url = '$_springBootBase/events';
+
+    final response = await http.post(
+      Uri.parse(url),
       headers: _headers,
       body: jsonEncode({
-        'studentId':      studentId,
-        'organizationId': organizationId,
-        'shortName':      shortName,
-        'fullName':       fullName,
-        'date':           date,
-        'venue':          venue,
-        'category':       category,
-        'description':    description,
-        'color':          color,
+        "studentId": studentId,
+        "organizationId": organizationId,
+        "shortName": shortName,
+        "fullName": fullName,
+        "date": date,
+        "venue": venue,
+        "category": category,
+        "description": description,
+        "color": color
       }),
-    ).timeout(const Duration(seconds: 15));
+    );
 
-    if (res.statusCode != 201) {
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(data['message'] ?? 'Failed to post event.');
+    if (response.statusCode != 201) {
+      throw Exception("Failed to post event: ${response.body}");
     }
   }
 }

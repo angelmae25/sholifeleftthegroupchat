@@ -300,16 +300,18 @@ class _ChatViewState extends State<ChatView> {
       title: 'Chat', currentRoute: '/chat',
       body: Consumer<ChatController>(builder: (_, ctrl, __) {
         if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
-        if (ctrl.conversations.isEmpty) return Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.chat_bubble_outline, size: 64, color: AppTheme.primary.withValues(alpha: 0.3)),
-            const SizedBox(height: 12),
-            Text('No conversations yet.', style: TextStyle(color: AppTheme.textSub(context), fontSize: 14)),
-            const SizedBox(height: 6),
-            Text('Tap "Chat Seller" on a marketplace item\nor "Contact" on a lost & found report.',
-                textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSub(context), fontSize: 12)),
-          ]),
-        );
+        if (ctrl.conversations.isEmpty) {
+          return Center(
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.chat_bubble_outline, size: 64, color: AppTheme.primary.withValues(alpha: 0.3)),
+              const SizedBox(height: 12),
+              Text('No conversations yet.', style: TextStyle(color: AppTheme.textSub(context), fontSize: 14)),
+              const SizedBox(height: 6),
+              Text('Tap "Chat Seller" on a marketplace item\nor "Contact" on a lost & found report.',
+                  textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSub(context), fontSize: 12)),
+            ]),
+          );
+        }
         return ListView.builder(
           itemCount: ctrl.conversations.length,
           itemBuilder: (_, i) {
@@ -486,6 +488,18 @@ class _ClubsViewState extends State<ClubsView> {
     WidgetsBinding.instance.addPostFrameCallback((_) => context.read<ClubsController>().loadClubs());
   }
 
+  // ── Show org detail bottom sheet ──────────────────────────────────────────
+  void _showOrgDetail(BuildContext context, ClubModel club) {
+    // Extract the numeric org id from 'org_<id>'
+    final rawId = club.id.startsWith('org_') ? club.id.replaceFirst('org_', '') : null;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _OrgDetailSheet(club: club, orgId: rawId),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: 'Clubs & Organizations', currentRoute: '/clubs',
@@ -518,13 +532,17 @@ class _ClubsViewState extends State<ClubsView> {
               Text(club.department, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
               const SizedBox(height: 12),
               if (isOrg)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: club.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: club.color.withValues(alpha: 0.3)),
+              // ── Tappable "Organization" button ────────────────────────
+                GestureDetector(
+                  onTap: () => _showOrgDetail(context, club),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: club.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: club.color.withValues(alpha: 0.3)),
+                    ),
+                    child: Text('Organization', style: TextStyle(color: club.color, fontSize: 11, fontWeight: FontWeight.w600)),
                   ),
-                  child: Text('Organization', style: TextStyle(color: club.color, fontSize: 11, fontWeight: FontWeight.w600)),
                 )
               else
                 GestureDetector(
@@ -538,7 +556,6 @@ class _ClubsViewState extends State<ClubsView> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(club.isJoined ? 'Joined ✓' : 'Join', style: TextStyle(
-                      // ← FIXED: Colors.white not AppTheme.cardColor(context)
                       color: club.isJoined ? Colors.white : club.color, fontSize: 12, fontWeight: FontWeight.w700,
                     )),
                   ),
@@ -550,6 +567,265 @@ class _ClubsViewState extends State<ClubsView> {
     }),
   );
 }
+
+// =============================================================================
+// ORG DETAIL BOTTOM SHEET
+// Fetches org info + officers from Spring Boot GET /api/org-post/organizations/{id}
+// =============================================================================
+class _OrgDetailSheet extends StatefulWidget {
+  final ClubModel club;
+  final String?   orgId;
+  const _OrgDetailSheet({required this.club, this.orgId});
+
+  @override
+  State<_OrgDetailSheet> createState() => _OrgDetailSheetState();
+}
+
+class _OrgDetailSheetState extends State<_OrgDetailSheet> {
+  // ── Spring Boot base (same IP as OrgPostService) ──────────────────────────
+  // Update this IP to match your PC's WiFi IP.
+  static const String _springBase = 'http://192.168.1.26:8080/api/org-post';
+
+  bool                _loading = true;
+  String?             _error;
+  Map<String, Object> _detail  = {};
+  List<dynamic>       _officers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDetail();
+  }
+
+  Future<void> _fetchDetail() async {
+    if (widget.orgId == null) {
+      setState(() { _loading = false; });
+      return;
+    }
+    try {
+      final res = await http
+          .get(Uri.parse('$_springBase/organizations/${widget.orgId}'))
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        setState(() {
+          _detail   = data.cast<String, Object>();
+          _officers = (data['officers'] as List?) ?? [];
+          _loading  = false;
+        });
+      } else {
+        setState(() { _error = 'Could not load details (${res.statusCode}).'; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = 'Cannot reach server. Check your connection.'; _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color   = widget.club.color;
+    final isDark  = AppTheme.isDark(context);
+    final cardBg  = AppTheme.cardColor(context);
+    final textMain = AppTheme.textMain(context);
+    final textSub  = AppTheme.textSub(context);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.4,
+      builder: (_, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(children: [
+          // ── Drag handle ──────────────────────────────────────────────────
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 4),
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+
+          // ── Header ───────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: Row(children: [
+              Container(
+                width: 52, height: 52,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12), shape: BoxShape.circle,
+                ),
+                child: Icon(widget.club.icon, color: color, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(widget.club.name,
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textMain)),
+                  if (widget.club.department.isNotEmpty)
+                    Text(widget.club.department,
+                        style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withValues(alpha: 0.3)),
+                ),
+                child: Text('Organization', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 12),
+          Divider(height: 1, color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.08)),
+          const SizedBox(height: 4),
+
+          // ── Scrollable body ───────────────────────────────────────────────
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                : _error != null
+                ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.cloud_off_outlined, color: textSub, size: 40),
+                  const SizedBox(height: 12),
+                  Text(_error!, textAlign: TextAlign.center,
+                      style: TextStyle(color: textSub, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); _fetchDetail(); },
+                      child: const Text('Retry')),
+                ]),
+              ),
+            )
+                : ListView(
+              controller: scrollCtrl,
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              children: [
+
+                // ── Info grid ──────────────────────────────────────
+                _InfoRow(
+                  Icons.person_outline,
+                  'Adviser',
+                  (_detail['adviser'] as String?)?.isNotEmpty == true
+                      ? _detail['adviser'] as String
+                      : '—',
+                ),
+                _InfoRow(
+                  Icons.calendar_today_outlined,
+                  'Year Founded',
+                  _detail['yearFounded'] != null
+                      ? _detail['yearFounded'].toString()
+                      : '—',
+                ),
+
+                // ── Description ────────────────────────────────────
+                if ((_detail['description'] as String?)?.isNotEmpty == true) ...[
+                  const SizedBox(height: 14),
+                  Text('About', style: TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13, color: textMain)),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.05) : color.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: color.withValues(alpha: 0.12)),
+                    ),
+                    child: Text(
+                      _detail['description'] as String,
+                      style: TextStyle(fontSize: 13, color: textSub, height: 1.55),
+                    ),
+                  ),
+                ],
+
+                // ── Officers ───────────────────────────────────────
+                const SizedBox(height: 18),
+                Row(children: [
+                  Text('Officers', style: TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13, color: textMain)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('${_officers.length}',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+
+                if (_officers.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text('No officers appointed yet.',
+                        style: TextStyle(fontSize: 13, color: textSub)),
+                  )
+                else
+                  ...(_officers.map((o) {
+                    final officer = o as Map<String, dynamic>;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.grey.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.07),
+                        ),
+                      ),
+                      child: Row(children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: color.withValues(alpha: 0.15),
+                          child: Text(
+                            (officer['name'] as String? ?? 'O').substring(0, 1).toUpperCase(),
+                            style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 15),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(officer['name'] as String? ?? '—',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textMain)),
+                            const SizedBox(height: 2),
+                            Text(officer['course'] as String? ?? '',
+                                style: TextStyle(fontSize: 11, color: textSub)),
+                            Text(officer['studentId'] as String? ?? '',
+                                style: TextStyle(fontSize: 11, color: textSub, fontFamily: 'monospace')),
+                          ]),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(officer['role'] as String? ?? '',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                        ),
+                      ]),
+                    );
+                  }).toList()),
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LEADERBOARD VIEW
@@ -699,6 +975,7 @@ class _ProfileViewState extends State<ProfileView> {
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditProfileView(user: user)))
                   .then((_) {
+                if (!context.mounted) return;
                 final auth = context.read<AuthController>();
                 context.read<ProfileController>().loadProfile(auth.user?.id ?? '');
               }),
@@ -915,6 +1192,7 @@ void _showChangePasswordDialog(BuildContext context) {
             if (newPw.length < 6) { setState(() => errorMsg = 'Password must be at least 6 characters.'); return; }
             setState(() { isSubmitting = true; errorMsg = null; });
             final ok = await context.read<AuthController>().changePassword(current: current, newPassword: newPw);
+            if (!context.mounted) return;
             if (ok) {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
