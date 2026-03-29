@@ -1,6 +1,7 @@
 // FILE PATH: lib/views/feature_views.dart
 
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -885,45 +886,60 @@ class _NewsDetailSheetState extends State<_NewsDetailSheet> {
   }
 
   Future<void> _awardPoints() async {
-    final articleId = int.tryParse(widget.article.id.toString()) ?? 0;
-    if (_awardedNewsIds.contains(articleId)) return;
+    final articleId = widget.article.id;
+    if (_awardedNewsIds.contains(articleId)) {
+      debugPrint('[_awardPoints] Already awarded for article $articleId');
+      return;
+    }
 
-    final studentId = context.read<AuthController>().user?.studentId ?? '';
-    if (studentId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token') ?? '';
+
+    debugPrint('[_awardPoints] Token: ${token.isEmpty ? "EMPTY - not logged in!" : "found"}');
+    if (token.isEmpty) return;
 
     try {
-      final uri = Uri.parse('http://192.168.1.11:8080/api/leaderboard/add-points');
+      final uri = Uri.parse('http://192.168.1.11:5000/api/mobile/news/$articleId/read');
+      debugPrint('[_awardPoints] Calling: $uri');
+
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'studentId': studentId,
-          'points': 10,
-          'reason': 'read_news',
-          'referenceId': articleId,
-        }),
-      );
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint('[_awardPoints] Status: ${response.statusCode}');
+      debugPrint('[_awardPoints] Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _awardedNewsIds.add(articleId);
-        if (mounted) {
+        _awardedNewsIds.add(articleId as int);
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final pts = ((body['points'] ?? 0) as num).toInt();
+        final already = body['already_read'] == true;
+
+        debugPrint('[_awardPoints] pts=$pts already=$already');
+
+        if (mounted && !already) {
           setState(() => _pointsAwarded = true);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Row(children: [
-              Icon(Icons.stars_outlined, color: Colors.white),
-              SizedBox(width: 10),
-              Text('+10 points earned for reading!',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+            content: Row(children: [
+              const Icon(Icons.stars_outlined, color: Colors.white),
+              const SizedBox(width: 10),
+              Text('+10 points earned! You now have $pts points.',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
             ]),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             duration: const Duration(seconds: 3),
           ));
+          context.read<AuthController>().refreshPoints(pts);
         }
       }
-    } catch (_) {
-      // Silently fail — points are a bonus, not critical
+    } catch (e) {
+      debugPrint('[_awardPoints] ERROR: $e');
     }
   }
 

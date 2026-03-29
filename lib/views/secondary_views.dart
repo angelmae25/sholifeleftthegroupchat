@@ -887,8 +887,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
                         style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.textSub(context)))),
                   ),
                   const SizedBox(width: 12),
-                  const CircleAvatar(radius: 20, backgroundColor: Color(0x268B1A1A),
-                      child: Icon(Icons.person, color: AppTheme.primary)),
+                  _LeaderboardAvatar(avatarUrl: e.avatarUrl, radius: 20),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(e.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textMain(context))),
@@ -915,9 +914,7 @@ class _PodiumCol extends StatelessWidget {
     return Column(children: [
       Text(medals[entry.rank - 1], style: const TextStyle(fontSize: 24)),
       const SizedBox(height: 4),
-      const CircleAvatar(radius: 24, backgroundColor: Color(0x338B1A1A),
-          // ← FIXED: Colors.white not AppTheme.cardColor(context)
-          child: Icon(Icons.person, color: Colors.white, size: 26)),
+      _LeaderboardAvatar(avatarUrl: entry.avatarUrl, radius: 24),
       const SizedBox(height: 4),
       Text(entry.name.split(' ').first,
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
@@ -1432,6 +1429,35 @@ class _ProfileAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: radius, backgroundColor: AppTheme.accentLight,
       child: Icon(Icons.person, size: radius * 1.1, color: AppTheme.primaryDark),
+    );
+  }
+}
+class _LeaderboardAvatar extends StatelessWidget {
+  final String? avatarUrl;
+  final double radius;
+  const _LeaderboardAvatar({this.avatarUrl, required this.radius});
+
+  @override
+  Widget build(BuildContext context) {
+    if (avatarUrl != null && avatarUrl!.isNotEmpty) {
+      if (avatarUrl!.startsWith('data:image')) {
+        try {
+          final bytes = base64Decode(avatarUrl!.split(',').last);
+          return CircleAvatar(radius: radius, backgroundImage: MemoryImage(bytes));
+        } catch (_) {}
+      } else if (avatarUrl!.startsWith('http')) {
+        return CircleAvatar(
+          radius: radius,
+          backgroundImage: NetworkImage(avatarUrl!),
+          onBackgroundImageError: (_, __) {},
+          backgroundColor: const Color(0x338B1A1A),
+        );
+      }
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0x338B1A1A),
+      child: Icon(Icons.person, color: Colors.white, size: radius * 1.1),
     );
   }
 }

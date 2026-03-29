@@ -88,6 +88,14 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Called after earning points (read news, attend event) to update
+  /// the displayed points in the profile/leaderboard without a full reload.
+  void refreshPoints(int newPoints) {
+    if (_user == null) return;
+    _user = _user!.copyWith(points: newPoints);
+    notifyListeners();
+  }
+
   // ── Change Password ─────────────────────────────────────────────────────────
   /// Verifies current password then updates to new password.
   /// Returns true on success, false on failure.
