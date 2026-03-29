@@ -1,8 +1,8 @@
 // FILE PATH: lib/views/create_post_view.dart
 //
-// Opened via FAB in NewsView or EventsView.
+// Opened via FAB in NewsView (initialTab: 'news') or EventsView (initialTab: 'event').
+// Each route opens ONLY its own form — no tab switching between News and Event.
 // Only visible to students with an org role assignment.
-// initialTab: 'news' | 'event'
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -21,26 +21,26 @@ class CreatePostView extends StatefulWidget {
   State<CreatePostView> createState() => _CreatePostViewState();
 }
 
-class _CreatePostViewState extends State<CreatePostView>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabCtrl;
+class _CreatePostViewState extends State<CreatePostView> {
 
-  // ── News fields ──────────────────────────────────────────────────────────
+  // ── News fields ────────────────────────────────────────────────────────────
   final _newsTitleCtrl = TextEditingController();
   final _newsBodyCtrl  = TextEditingController();
-  String _newsCategory  = 'campus';
-  bool   _isFeatured    = false;
+  String _newsCategory = 'campus';
+  bool   _isFeatured   = false;
 
-  // ── Event fields ─────────────────────────────────────────────────────────
-  final _shortNameCtrl  = TextEditingController();
-  final _fullNameCtrl   = TextEditingController();
-  final _venueCtrl      = TextEditingController();
-  final _descCtrl       = TextEditingController();
-  String   _eventCategory = 'General';
+  // ── Event fields ───────────────────────────────────────────────────────────
+  final _shortNameCtrl = TextEditingController();
+  final _fullNameCtrl  = TextEditingController();
+  final _venueCtrl     = TextEditingController();
+  final _descCtrl      = TextEditingController();
+  String    _eventCategory = 'General';
   DateTime? _eventDate;
-  String   _eventColor    = '#8B1A1A';
+  String    _eventColor    = '#8B1A1A';
 
   bool _isSubmitting = false;
+
+  bool get _isNewsMode => widget.initialTab == 'news';
 
   static const _newsCategories  = ['all', 'health', 'academic', 'campus', 'sports'];
   static const _eventCategories = ['General', 'Academic', 'Cultural', 'Sports', 'Service'];
@@ -56,16 +56,20 @@ class _CreatePostViewState extends State<CreatePostView>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(
-      length: 2,
-      vsync: this,
-      initialIndex: widget.initialTab == 'event' ? 1 : 0,
-    );
+    // ── Load orgs if not already loaded ─────────────────────────────────────
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<AuthController>().user;
+      if (user != null) {
+        context.read<OrgPostController>().loadMyOrganizations(
+          user.studentId,
+          dbId: user.id,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
-    _tabCtrl.dispose();
     _newsTitleCtrl.dispose();
     _newsBodyCtrl.dispose();
     _shortNameCtrl.dispose();
@@ -75,7 +79,7 @@ class _CreatePostViewState extends State<CreatePostView>
     super.dispose();
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
   String get _studentId =>
       context.read<AuthController>().user?.studentId ?? '';
 
@@ -104,7 +108,7 @@ class _CreatePostViewState extends State<CreatePostView>
     ));
   }
 
-  // ── Submit News ───────────────────────────────────────────────────────────
+  // ── Submit News ────────────────────────────────────────────────────────────
   Future<void> _submitNews() async {
     final title = _newsTitleCtrl.text.trim();
     final body  = _newsBodyCtrl.text.trim();
@@ -112,7 +116,8 @@ class _CreatePostViewState extends State<CreatePostView>
     if (title.isEmpty) { _showError('Title is required.'); return; }
     if (body.isEmpty)  { _showError('Content is required.'); return; }
     if (_selectedOrg == null) {
-      _showError('No organization selected.'); return;
+      _showError('No organization selected. Make sure you have an officer role assigned.');
+      return;
     }
 
     setState(() => _isSubmitting = true);
@@ -137,7 +142,7 @@ class _CreatePostViewState extends State<CreatePostView>
     }
   }
 
-  // ── Submit Event ──────────────────────────────────────────────────────────
+  // ── Submit Event ───────────────────────────────────────────────────────────
   Future<void> _submitEvent() async {
     final shortName = _shortNameCtrl.text.trim();
     final fullName  = _fullNameCtrl.text.trim();
@@ -149,7 +154,8 @@ class _CreatePostViewState extends State<CreatePostView>
     if (venue.isEmpty)     { _showError('Venue is required.'); return; }
     if (_eventDate == null){ _showError('Please select a date.'); return; }
     if (_selectedOrg == null) {
-      _showError('No organization selected.'); return;
+      _showError('No organization selected. Make sure you have an officer role assigned.');
+      return;
     }
 
     setState(() => _isSubmitting = true);
@@ -177,7 +183,7 @@ class _CreatePostViewState extends State<CreatePostView>
     }
   }
 
-  // ── Date picker ───────────────────────────────────────────────────────────
+  // ── Date picker ────────────────────────────────────────────────────────────
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -208,90 +214,114 @@ class _CreatePostViewState extends State<CreatePostView>
           appBar: AppBar(
             backgroundColor: AppTheme.primary,
             foregroundColor: Colors.white,
-            title: const Text('Create Post',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-            bottom: TabBar(
-              controller: _tabCtrl,
-              indicatorColor: AppTheme.accentLight,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white60,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-              tabs: const [
-                Tab(icon: Icon(Icons.newspaper_outlined), text: 'News'),
-                Tab(icon: Icon(Icons.event_outlined),     text: 'Event'),
-              ],
+            // Title reflects which form is open — no tabs
+            title: Text(
+              _isNewsMode ? 'Post News Article' : 'Post Event',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
             ),
           ),
           body: Column(children: [
-            // ── Org selector banner ──────────────────────────────────────
-            if (orgs.length > 1)
+
+            // ── Org selector / banner ──────────────────────────────────────
+            if (orgCtrl.isLoading)
               Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 color: AppTheme.primary.withOpacity(0.06),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
-                child: Row(children: [
-                  const Icon(Icons.verified_outlined,
-                      size: 16, color: AppTheme.primary),
-                  const SizedBox(width: 8),
-                  const Text('Posting as:',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 8),
+                child: const Row(children: [
+                  SizedBox(
+                    width: 14, height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppTheme.primary),
+                  ),
+                  SizedBox(width: 10),
+                  Text('Loading your organizations...',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                ]),
+              )
+            else if (orgs.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: Colors.orange.shade50,
+                child: const Row(children: [
+                  Icon(Icons.warning_amber_outlined, size: 16, color: Colors.orange),
+                  SizedBox(width: 8),
                   Expanded(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<OrgAssignment>(
-                        value: orgCtrl.selectedOrg,
-                        isDense: true,
-                        items: orgs.map((o) => DropdownMenuItem(
-                          value: o,
-                          child: Text(
-                            '${o.roleName} · ${o.acronym.isNotEmpty ? o.acronym : o.organizationName}',
-                            style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.primary),
-                          ),
-                        )).toList(),
-                        onChanged: (o) {
-                          if (o != null) orgCtrl.selectOrg(o);
-                        },
-                      ),
+                    child: Text(
+                      'You have no officer role assigned. Contact your admin.',
+                      style: TextStyle(fontSize: 12, color: Colors.orange,
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
                 ]),
               )
-            else if (orgs.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
-                color: AppTheme.primary.withOpacity(0.06),
-                child: Row(children: [
-                  const Icon(Icons.verified_outlined,
-                      size: 16, color: AppTheme.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Posting as ${orgs.first.roleName} · '
-                        '${orgs.first.acronym.isNotEmpty ? orgs.first.acronym : orgs.first.organizationName}',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ]),
-              ),
+            else if (orgs.length > 1)
+              // Multiple orgs — show dropdown to select which one to post as
+                Container(
+                  color: AppTheme.primary.withOpacity(0.06),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(children: [
+                    const Icon(Icons.verified_outlined,
+                        size: 16, color: AppTheme.primary),
+                    const SizedBox(width: 8),
+                    const Text('Posting as:',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<OrgAssignment>(
+                          value: orgCtrl.selectedOrg,
+                          isDense: true,
+                          items: orgs.map((o) => DropdownMenuItem(
+                            value: o,
+                            child: Text(
+                              '${o.roleName} · ${o.acronym.isNotEmpty ? o.acronym : o.organizationName}',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primary),
+                            ),
+                          )).toList(),
+                          onChanged: (o) {
+                            if (o != null) orgCtrl.selectOrg(o);
+                          },
+                        ),
+                      ),
+                    ),
+                  ]),
+                )
+              else
+              // Single org — just show a banner
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  color: AppTheme.primary.withOpacity(0.06),
+                  child: Row(children: [
+                    const Icon(Icons.verified_outlined,
+                        size: 16, color: AppTheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Posting as ${orgs.first.roleName} · '
+                          '${orgs.first.acronym.isNotEmpty ? orgs.first.acronym : orgs.first.organizationName}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ]),
+                ),
 
-            // ── Tab content ──────────────────────────────────────────────
+            // ── Form content — only the relevant form is shown ─────────────
             Expanded(
-              child: TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _NewsForm(),
-                  _EventForm(),
-                ],
-              ),
+              child: _isNewsMode ? _buildNewsForm() : _buildEventForm(),
             ),
           ]),
         );
@@ -302,12 +332,11 @@ class _CreatePostViewState extends State<CreatePostView>
   // ─────────────────────────────────────────────────────────────────────────
   // NEWS FORM
   // ─────────────────────────────────────────────────────────────────────────
-  Widget _NewsForm() {
+  Widget _buildNewsForm() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-        // Title
         _label('Title *'),
         const SizedBox(height: 8),
         TextFormField(
@@ -318,7 +347,6 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Body
         _label('Content *'),
         const SizedBox(height: 8),
         TextFormField(
@@ -329,7 +357,6 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Category
         _label('Category'),
         const SizedBox(height: 8),
         Wrap(
@@ -341,8 +368,7 @@ class _CreatePostViewState extends State<CreatePostView>
               onTap: () => setState(() => _newsCategory = cat),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: sel ? AppTheme.primary : Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -372,8 +398,7 @@ class _CreatePostViewState extends State<CreatePostView>
             border: Border.all(color: AppTheme.inputBorder),
           ),
           child: Row(children: [
-            const Icon(Icons.star_outline,
-                color: AppTheme.primary, size: 20),
+            const Icon(Icons.star_outline, color: AppTheme.primary, size: 20),
             const SizedBox(width: 12),
             const Expanded(
               child: Column(
@@ -396,7 +421,7 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 32),
 
-        // Submit
+        // Submit button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -416,8 +441,7 @@ class _CreatePostViewState extends State<CreatePostView>
                 : const Icon(Icons.newspaper_outlined, size: 20),
             label: Text(
               _isSubmitting ? 'Posting...' : 'Publish News Article',
-              style: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -429,12 +453,11 @@ class _CreatePostViewState extends State<CreatePostView>
   // ─────────────────────────────────────────────────────────────────────────
   // EVENT FORM
   // ─────────────────────────────────────────────────────────────────────────
-  Widget _EventForm() {
+  Widget _buildEventForm() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-        // Short name
         _label('Short Name / Acronym *'),
         const SizedBox(height: 8),
         TextFormField(
@@ -445,7 +468,6 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Full name
         _label('Full Event Name *'),
         const SizedBox(height: 8),
         TextFormField(
@@ -455,15 +477,13 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Date
         _label('Event Date *'),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: _pickDate,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
@@ -488,7 +508,6 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Venue
         _label('Venue *'),
         const SizedBox(height: 8),
         TextFormField(
@@ -498,7 +517,6 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Category
         _label('Category'),
         const SizedBox(height: 8),
         Wrap(
@@ -510,8 +528,7 @@ class _CreatePostViewState extends State<CreatePostView>
               onTap: () => setState(() => _eventCategory = cat),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: sel ? AppTheme.primary : Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -520,9 +537,7 @@ class _CreatePostViewState extends State<CreatePostView>
                 ),
                 child: Text(cat,
                     style: TextStyle(
-                      color: sel
-                          ? Colors.white
-                          : AppTheme.textSecondary,
+                      color: sel ? Colors.white : AppTheme.textSecondary,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     )),
@@ -532,7 +547,6 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Description
         _label('Description'),
         const SizedBox(height: 8),
         TextFormField(
@@ -543,14 +557,13 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 16),
 
-        // Color picker
         _label('Event Color'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 10,
           runSpacing: 8,
           children: _colorOptions.map((opt) {
-            final sel = _eventColor == opt.hex;
+            final sel   = _eventColor == opt.hex;
             final color = Color(
                 int.parse('FF${opt.hex.replaceAll('#', '')}', radix: 16));
             return GestureDetector(
@@ -566,14 +579,11 @@ class _CreatePostViewState extends State<CreatePostView>
                     width: 3,
                   ),
                   boxShadow: sel
-                      ? [BoxShadow(
-                      color: color.withOpacity(0.4),
-                      blurRadius: 8)]
+                      ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 8)]
                       : [],
                 ),
                 child: sel
-                    ? const Icon(Icons.check,
-                    color: Colors.white, size: 18)
+                    ? const Icon(Icons.check, color: Colors.white, size: 18)
                     : null,
               ),
             );
@@ -581,7 +591,7 @@ class _CreatePostViewState extends State<CreatePostView>
         ),
         const SizedBox(height: 32),
 
-        // Submit
+        // Submit button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -601,8 +611,7 @@ class _CreatePostViewState extends State<CreatePostView>
                 : const Icon(Icons.event_outlined, size: 20),
             label: Text(
               _isSubmitting ? 'Posting...' : 'Publish Event',
-              style: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -632,12 +641,11 @@ class _CreatePostViewState extends State<CreatePostView>
     focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
-    hintStyle: const TextStyle(
-        color: AppTheme.textSecondary, fontSize: 13),
+    hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
   );
 }
 
-// ── Color option data class ────────────────────────────────────────────────
+// ── Color option data class ─────────────────────────────────────────────────
 class _ColorOpt {
   final String hex, label;
   const _ColorOpt(this.hex, this.label);

@@ -584,7 +584,7 @@ class _OrgDetailSheet extends StatefulWidget {
 class _OrgDetailSheetState extends State<_OrgDetailSheet> {
   // ── Spring Boot base (same IP as OrgPostService) ──────────────────────────
   // Update this IP to match your PC's WiFi IP.
-  static const String _springBase = 'http://192.168.1.26:8080/api/org-post';
+  static const String _springBase = 'http://192.168.1.11:8080/api/org-post';
 
   bool                _loading = true;
   String?             _error;
