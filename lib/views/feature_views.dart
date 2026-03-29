@@ -1,7 +1,9 @@
 // FILE PATH: lib/views/feature_views.dart
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/controllers.dart';
@@ -166,27 +168,20 @@ class _NewsViewState extends State<NewsView> {
 
           drawer: _buildDrawer(context, '/news'),
 
-          floatingActionButton: hasRole
-              ? FloatingActionButton.extended(
-            heroTag: 'news_fab',
-            onPressed: () =>
-                context.push('/create-post', extra: 'news'),
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+          floatingActionButton: FloatingActionButton(
+            heroTag: "news_post",
             backgroundColor: AppTheme.primary,
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text(
-              'Post News',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700),
-            ),
-          )
-              : null,
+            shape: const CircleBorder(),
+            child: const Icon(Icons.add, color: Colors.white, size: 28),
+            onPressed: () {
+              context.push('/create-post', extra: 'news');
+            },
+          ),
+
 
           body: Column(
             children: [
-
-              if (hasRole)
-                _OrgRoleBanner(orgCtrl: orgCtrl),
 
               Container(
                 color: cardClr,
@@ -337,7 +332,6 @@ class _EventsViewState extends State<EventsView> {
           )
               : null,
           body: Column(children: [
-            if (hasRole) _OrgRoleBanner(orgCtrl: orgCtrl),
             if (evCtrl.isLoading)
               const Expanded(child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
             else if (evCtrl.error != null)
@@ -675,42 +669,76 @@ class _NewsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardClr = AppTheme.cardColor(context);
+    final color = article.category.color;
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: cardClr,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
-      ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 60, height: 60,
-          decoration: BoxDecoration(
-            color: article.category.color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(Icons.article_outlined, color: article.category.color, size: 28),
+        gradient: LinearGradient(
+          colors: [color, color.withValues(alpha: 0.75)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Category chip
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: article.category.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(article.category.tag, style: TextStyle(color: article.category.color, fontSize: 10, fontWeight: FontWeight.w700)),
+            child: Text(
+              article.category.tag,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 11,
+                  fontWeight: FontWeight.w800, letterSpacing: 1.2),
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(article.title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textMain(context))),
-          Text(article.body, maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: AppTheme.textSub(context), fontSize: 12, height: 1.4)),
+          const SizedBox(height: 10),
+          // Title
+          Text(
+            article.title,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 18,
+                fontWeight: FontWeight.w900, height: 1.2),
+          ),
           const SizedBox(height: 6),
-          Text(article.timeAgo, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
-        ])),
-      ]),
+          // Short preview — 2 lines max
+          Text(
+            article.body,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                color: Colors.white70, fontSize: 13, height: 1.45),
+          ),
+          const SizedBox(height: 14),
+          // Footer: time + Read More button
+          Row(children: [
+            const Icon(Icons.access_time, color: Colors.white54, size: 14),
+            const SizedBox(width: 4),
+            Text(article.timeAgo,
+                style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => _NewsDetailSheet.show(context, article),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text('Read More',
+                    style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ]),
+        ]),
+      ),
     );
   }
 }
@@ -720,45 +748,53 @@ class _FeaturedNewsCard extends StatelessWidget {
   const _FeaturedNewsCard({required this.article});
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [article.category.color, article.category.color.withValues(alpha: 0.7)],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(article.category.tag,
-              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () => _NewsDetailSheet.show(context, article),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [article.category.color, article.category.color.withValues(alpha: 0.7)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
-        const SizedBox(height: 12),
-        Text(article.title, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, height: 1.1)),
-        const SizedBox(height: 8),
-        // ← FIXED: Colors.white70 not AppTheme.cardColor(context)70
-        Text(article.body, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5)),
-        const SizedBox(height: 16),
-        Row(children: [
-          const Icon(Icons.access_time, color: Colors.white54, size: 14),
-          const SizedBox(width: 4),
-          Text(article.timeAgo, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          const Spacer(),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-            child: Text('Read More', style: TextStyle(color: article.category.color, fontSize: 12, fontWeight: FontWeight.w700)),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(article.category.tag,
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
           ),
+          const SizedBox(height: 12),
+          Text(article.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, height: 1.2)),
+          const SizedBox(height: 8),
+          Text(article.body,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5)),
+          const SizedBox(height: 16),
+          Row(children: [
+            const Icon(Icons.access_time, color: Colors.white54, size: 14),
+            const SizedBox(width: 4),
+            Text(article.timeAgo, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => _NewsDetailSheet.show(context, article),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                child: Text('Read More', style: TextStyle(color: article.category.color, fontSize: 12, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ]),
         ]),
-      ]),
+      ),
     ),
   );
 }
@@ -813,4 +849,311 @@ class _ErrorWidget extends StatelessWidget {
       Text(message, style: TextStyle(color: AppTheme.textSub(context))),
     ]),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEWS DETAIL BOTTOM SHEET  (with +10 points on read)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Tracks which article IDs have already awarded points this session.
+final Set<int> _awardedNewsIds = {};
+
+class _NewsDetailSheet extends StatefulWidget {
+  final NewsModel article;
+  const _NewsDetailSheet({required this.article});
+
+  static void show(BuildContext context, NewsModel article) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NewsDetailSheet(article: article),
+    );
+  }
+
+  @override
+  State<_NewsDetailSheet> createState() => _NewsDetailSheetState();
+}
+
+class _NewsDetailSheetState extends State<_NewsDetailSheet> {
+  bool _pointsAwarded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _awardPoints());
+  }
+
+  Future<void> _awardPoints() async {
+    final articleId = int.tryParse(widget.article.id.toString()) ?? 0;
+    if (_awardedNewsIds.contains(articleId)) return;
+
+    final studentId = context.read<AuthController>().user?.studentId ?? '';
+    if (studentId.isEmpty) return;
+
+    try {
+      final uri = Uri.parse('http://192.168.1.11:8080/api/leaderboard/add-points');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'studentId': studentId,
+          'points': 10,
+          'reason': 'read_news',
+          'referenceId': articleId,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _awardedNewsIds.add(articleId);
+        if (mounted) {
+          setState(() => _pointsAwarded = true);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Row(children: [
+              Icon(Icons.stars_outlined, color: Colors.white),
+              SizedBox(width: 10),
+              Text('+10 points earned for reading!',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ]),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ));
+        }
+      }
+    } catch (_) {
+      // Silently fail — points are a bonus, not critical
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final article = widget.article;
+    final cardClr = AppTheme.cardColor(context);
+    final textMain = AppTheme.textMain(context);
+    final textSub  = AppTheme.textSub(context);
+    final screenH  = MediaQuery.of(context).size.height;
+
+    // Safely read optional fields that may exist on NewsModel
+    final String authorName  = _tryGet(() => article.authorName,  fallback: 'Scholife Editorial');
+    final String? imageUrl   = _tryGetNullable(() => article.imageUrl);
+    final String publishedAt = _tryGetDateTime(() => article.publishedAt, fallback: article.timeAgo);
+
+    final bool hasImage = imageUrl != null && imageUrl.isNotEmpty;
+
+    return Container(
+      height: screenH * 0.92,
+      decoration: BoxDecoration(
+        color: cardClr,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(children: [
+
+        // ── Drag handle ────────────────────────────────────────────────────
+        Container(
+          margin: const EdgeInsets.only(top: 12),
+          width: 40, height: 4,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+
+        // ── HERO IMAGE or gradient header ──────────────────────────────────
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: SizedBox(
+            height: hasImage ? 220 : 160,
+            width: double.infinity,
+            child: Stack(fit: StackFit.expand, children: [
+
+              // background: real image OR category gradient
+              if (hasImage)
+                Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _gradientFallback(article),
+                )
+              else
+                _gradientFallback(article),
+
+              // dark overlay for readability
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.10),
+                      Colors.black.withValues(alpha: 0.65),
+                    ],
+                  ),
+                ),
+              ),
+
+              // top row: category chip + points badge + close button
+              Positioned(
+                top: 14, left: 14, right: 14,
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(article.category.tag,
+                        style: const TextStyle(color: Colors.white, fontSize: 11,
+                            fontWeight: FontWeight.w800, letterSpacing: 1)),
+                  ),
+                  const Spacer(),
+                  if (_pointsAwarded) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade600,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.stars_outlined, color: Colors.white, size: 13),
+                        SizedBox(width: 4),
+                        Text('+10 pts', style: TextStyle(color: Colors.white,
+                            fontSize: 11, fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ]),
+              ),
+
+              // bottom: title + author + time
+              Positioned(
+                bottom: 14, left: 14, right: 14,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(article.title,
+                      style: const TextStyle(color: Colors.white, fontSize: 20,
+                          fontWeight: FontWeight.w900, height: 1.25),
+                      maxLines: 3, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    const Icon(Icons.person_outline, color: Colors.white60, size: 13),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(authorName,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    const Icon(Icons.access_time, color: Colors.white60, size: 13),
+                    const SizedBox(width: 4),
+                    Text(publishedAt,
+                        style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                  ]),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+
+        // ── Body content ───────────────────────────────────────────────────
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+              // divider label
+              Row(children: [
+                Container(width: 3, height: 18,
+                    decoration: BoxDecoration(
+                        color: article.category.color,
+                        borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 8),
+                Text('Full Article',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                        color: article.category.color)),
+              ]),
+              const SizedBox(height: 14),
+
+              // full body text
+              Text(
+                article.body,
+                style: TextStyle(fontSize: 15, height: 1.8, color: textMain),
+              ),
+
+              const SizedBox(height: 24),
+              Divider(color: Colors.grey.shade200),
+              const SizedBox(height: 12),
+
+              // footer: posted by + category
+              Row(children: [
+                Icon(Icons.edit_note_outlined, size: 15, color: textSub),
+                const SizedBox(width: 6),
+                Text('Posted by ', style: TextStyle(fontSize: 12, color: textSub)),
+                Text(authorName,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                        color: article.category.color)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: article.category.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(article.category.tag,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                          color: article.category.color)),
+                ),
+              ]),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+Widget _gradientFallback(NewsModel article) => Container(
+  decoration: BoxDecoration(
+    gradient: LinearGradient(
+      colors: [article.category.color, article.category.color.withValues(alpha: 0.7)],
+      begin: Alignment.topLeft, end: Alignment.bottomRight,
+    ),
+  ),
+);
+
+// ── helpers to safely access optional NewsModel fields ─────────────────────
+String _tryGet(String Function() fn, {required String fallback}) {
+  try { final v = fn(); return (v.isNotEmpty) ? v : fallback; }
+  catch (_) { return fallback; }
+}
+
+String? _tryGetNullable(String? Function() fn) {
+  try { return fn(); } catch (_) { return null; }
+}
+
+String _tryGetDateTime(dynamic Function() fn, {required String fallback}) {
+  try {
+    final v = fn();
+    if (v == null) return fallback;
+    if (v is String) return v.isNotEmpty ? v : fallback;
+    if (v is DateTime) {
+      final now = DateTime.now();
+      final diff = now.difference(v);
+      if (diff.inDays >= 1) return '${diff.inDays}d ago';
+      if (diff.inHours >= 1) return '${diff.inHours}h ago';
+      if (diff.inMinutes >= 1) return '${diff.inMinutes}m ago';
+      return 'Just now';
+    }
+    return v.toString();
+  } catch (_) { return fallback; }
 }
