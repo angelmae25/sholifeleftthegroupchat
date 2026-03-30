@@ -82,8 +82,8 @@ class _CreatePostViewState extends State<CreatePostView> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
       backgroundColor: Colors.red.shade700,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      behavior: SnackBarBehavior.fixed,  // ← changed
+      // remove shape (not needed for fixed)
     ));
   }
 
@@ -95,8 +95,7 @@ class _CreatePostViewState extends State<CreatePostView> {
         Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
       ]),
       backgroundColor: Colors.green.shade700,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      behavior: SnackBarBehavior.fixed,  // ← changed
     ));
   }
 

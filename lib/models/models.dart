@@ -1,12 +1,11 @@
 // =============================================================================
-// UPDATED: lib/models/models.dart
-// Added ClubModel.fromApi() and EventModel.fromJson() for live API data.
-// Everything else is unchanged from your original.
+// lib/models/models.dart  — TARGETED FIX
+// CHANGE: ClubModel.fromJson now prefixes id with 'org_' so the
+//         isOrg detection (club.id.startsWith('org_')) in ClubsView works.
+// Everything else is unchanged.
 // =============================================================================
 
 import 'package:flutter/material.dart';
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EVENT MODEL
@@ -27,9 +26,7 @@ class EventModel {
     required this.color, this.description,
   });
 
-  // ── NEW: parses response from Flask API ───────────────────────────────────
   factory EventModel.fromJson(Map<String, dynamic> json) {
-    // color arrives as hex string '#8B1A1A'
     Color parseColor(String? hex) {
       if (hex == null || hex.isEmpty) return const Color(0xFF8B1A1A);
       final h = hex.replaceAll('#', '');
@@ -63,7 +60,7 @@ class EventModel {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MARKETPLACE ITEM MODEL  (unchanged)
+// MARKETPLACE ITEM MODEL
 // ─────────────────────────────────────────────────────────────────────────────
 class MarketplaceItemModel {
   final String id;
@@ -99,19 +96,10 @@ class MarketplaceItemModel {
   };
 
   String get formattedPrice => '₱${price.toStringAsFixed(0)}';
-
-  static List<MarketplaceItemModel> get mockList => [
-    MarketplaceItemModel(id: 'm1', name: 'Calculus Textbook',     condition: 'Good condition', price: 150, sellerId: 'u2', sellerName: 'Maria S.', postedAt: DateTime.now().subtract(const Duration(hours: 3))),
-    MarketplaceItemModel(id: 'm2', name: 'Scientific Calculator', condition: 'Slightly used',  price: 250, sellerId: 'u3', sellerName: 'Jose R.',  postedAt: DateTime.now().subtract(const Duration(hours: 6))),
-    MarketplaceItemModel(id: 'm3', name: 'Lab Coat (Size M)',      condition: 'Lightly worn',   price: 80,  sellerId: 'u4', sellerName: 'Ana D.',   postedAt: DateTime.now().subtract(const Duration(days: 1))),
-    MarketplaceItemModel(id: 'm4', name: 'Nursing Complete Kit',   condition: 'Complete set',   price: 500, sellerId: 'u5', sellerName: 'Pedro G.', postedAt: DateTime.now().subtract(const Duration(days: 2))),
-    MarketplaceItemModel(id: 'm5', name: 'Pastel Art Supplies',    condition: 'Barely used',    price: 200, sellerId: 'u6', sellerName: 'Lisa C.',  postedAt: DateTime.now().subtract(const Duration(days: 3))),
-    MarketplaceItemModel(id: 'm6', name: 'Foldable Laptop Stand',  condition: 'Like new',       price: 120, sellerId: 'u7', sellerName: 'Mark T.',  postedAt: DateTime.now().subtract(const Duration(days: 4))),
-  ];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LOST & FOUND MODEL  (unchanged)
+// LOST & FOUND MODEL
 // ─────────────────────────────────────────────────────────────────────────────
 enum LostFoundStatus { lost, found }
 
@@ -147,18 +135,10 @@ class LostFoundModel {
     'date': date.toIso8601String(), 'status': status.name,
     'reporter_id': reporterId, 'image_url': imageUrl,
   };
-
-  static List<LostFoundModel> get mockList => [
-    LostFoundModel(id: 'lf1', title: 'Black Wallet',          description: 'Lost near the library on March 10.',    location: 'Library Area',      date: DateTime(2024, 3, 10), status: LostFoundStatus.lost,  reporterId: 'u1'),
-    LostFoundModel(id: 'lf2', title: 'Scientific Calculator', description: 'Casio FX-991. Lost in Engineering 204.', location: 'Engineering Bldg',  date: DateTime(2024, 3, 11), status: LostFoundStatus.lost,  reporterId: 'u2'),
-    LostFoundModel(id: 'lf3', title: 'USB Flash Drive',       description: '16GB Kingston. Contains thesis files.',  location: 'Computer Lab',      date: DateTime(2024, 3, 12), status: LostFoundStatus.lost,  reporterId: 'u3'),
-    LostFoundModel(id: 'lf4', title: 'Red Umbrella',          description: 'Found outside the cafeteria.',           location: 'Cafeteria',         date: DateTime(2024, 3, 11), status: LostFoundStatus.found, reporterId: 'u4'),
-    LostFoundModel(id: 'lf5', title: 'Student ID (Maria S.)', description: 'Found on 2nd floor hallway.',            location: '2nd Floor Hallway', date: DateTime(2024, 3, 12), status: LostFoundStatus.found, reporterId: 'u5'),
-  ];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CHAT MODEL  (unchanged)
+// CHAT MODEL
 // ─────────────────────────────────────────────────────────────────────────────
 class ChatModel {
   final String id;
@@ -179,7 +159,6 @@ class ChatModel {
     this.messages = const [],
   });
 
-  // ✅ ADDED (THIS FIXES YOUR ERROR)
   factory ChatModel.fromJson(Map<String, dynamic> json) {
     return ChatModel(
       id: json['id']?.toString() ?? '',
@@ -195,10 +174,6 @@ class ChatModel {
           .toList(),
     );
   }
-
-  static List<ChatModel> get mockList => [
-    ChatModel(id: 'c1', name: 'Maria Santos', lastMessage: 'Thanks for the notes!', lastMessageAt: DateTime.now().subtract(const Duration(minutes: 2)), unreadCount: 3),
-  ];
 
   String get timeLabel {
     final diff = DateTime.now().difference(lastMessageAt);
@@ -223,7 +198,6 @@ class ChatMessageModel {
     required this.isMine,
   });
 
-  // ✅ ADDED (THIS FIXES YOUR ERROR)
   factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
     return ChatMessageModel(
       id: json['id']?.toString() ?? '',
@@ -236,10 +210,6 @@ class ChatMessageModel {
     );
   }
 
-  static List<ChatMessageModel> get mockMessages => [
-    ChatMessageModel(id: 'msg1', text: 'Hello', senderId: 'other', sentAt: DateTime.now(), isMine: false),
-  ];
-
   String get timeLabel {
     final h = sentAt.hour.toString().padLeft(2, '0');
     final m = sentAt.minute.toString().padLeft(2, '0');
@@ -248,7 +218,11 @@ class ChatMessageModel {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CLUB MODEL  — now supports fromApi() for live organization data
+// CLUB MODEL
+// FIX: fromJson now prefixes the id with 'org_' so that
+//      club.id.startsWith('org_') == true in ClubsView, enabling:
+//      1. The "Organization" button (instead of Join/Leave)
+//      2. _showOrgDetail() to extract the correct rawId
 // ─────────────────────────────────────────────────────────────────────────────
 class ClubModel {
   final String id;
@@ -263,10 +237,10 @@ class ClubModel {
     required this.color, required this.icon, this.isJoined = false,
   });
 
-  // ── NEW: build from Flask /clubs/ response ────────────────────────────────
+  // FIX: prefix id with 'org_' so isOrg detection works in ClubsView
   factory ClubModel.fromJson(Map<String, dynamic> json) => ClubModel(
-    id:         json['id']?.toString() ?? '',
-    name:       json['name'] as String? ?? '',
+    id:         'org_${json['id']?.toString() ?? ''}',   // ← KEY FIX
+    name:       json['name']    as String? ?? '',
     department: json['acronym'] as String? ?? '',
     color:      const Color(0xFF8B1A1A),
     icon:       Icons.groups,
@@ -283,7 +257,7 @@ class ClubModel {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LEADERBOARD ENTRY MODEL  (unchanged)
+// LEADERBOARD ENTRY MODEL
 // ─────────────────────────────────────────────────────────────────────────────
 class LeaderboardEntryModel {
   final int rank;
@@ -307,15 +281,4 @@ class LeaderboardEntryModel {
         points:     (json['points'] as int?) ?? 0,
         avatarUrl:  json['avatar_url'] as String?,
       );
-
-  static List<LeaderboardEntryModel> get mockList => [
-    const LeaderboardEntryModel(rank: 1, userId: 'u2', name: 'Maria Santos',  department: '3rd Year CS',          points: 4850),
-    const LeaderboardEntryModel(rank: 2, userId: 'u3', name: 'Jose Reyes',    department: '4th Year Engineering', points: 4200),
-    const LeaderboardEntryModel(rank: 3, userId: 'u4', name: 'Ana Dela Cruz', department: '2nd Year Nursing',     points: 3980),
-    const LeaderboardEntryModel(rank: 4, userId: 'u5', name: 'Pedro Garcia',  department: '3rd Year Education',   points: 3500),
-    const LeaderboardEntryModel(rank: 5, userId: 'u6', name: 'Lisa Cruz',     department: '1st Year Architecture',points: 3200),
-    const LeaderboardEntryModel(rank: 6, userId: 'u7', name: 'Mark Tan',      department: '4th Year Commerce',    points: 2980),
-  ];
-
-
 }

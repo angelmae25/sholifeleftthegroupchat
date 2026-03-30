@@ -543,28 +543,46 @@ class OrgPostService {
   OrgPostService._();
   static final OrgPostService instance = OrgPostService._();
 
-  static const _headers = {'Content-Type': 'application/json'};
+  Future<Map<String, String>> get _authHeaders async {
+    final token = await AuthService.instance.getToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
-  Future<List<OrgAssignment>> fetchMyOrganizations(String studentId) async {
+  // Tries ?studentId= then ?userId= so it works regardless of which id is passed.
+  Future<List<OrgAssignment>> fetchMyOrganizations(String id) async {
+    final headers = await _authHeaders;
+    // Attempt 1: student number string (e.g. '2021-00123')
     try {
       final res = await http
-          .get(Uri.parse('$_flaskBase/my-organizations?studentId=$studentId'),
-          headers: _headers)
+          .get(Uri.parse('$_flaskBase/my-organizations?studentId=$id'),
+          headers: headers)
           .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
-        return (_safeJson(res) as List)
-            .map((e) => OrgAssignment.fromJson(e))
-            .toList();
+        final list = _safeJson(res);
+        if (list is List && list.isNotEmpty) {
+          return list.map((e) => OrgAssignment.fromJson(e)).toList();
+        }
       }
-      throw Exception('Server error ${res.statusCode}');
-    } catch (e) {
-      throw Exception(
-        'Cannot connect to Spring Boot.\n\n'
-            'Check:\n1️⃣ Spring Boot running\n'
-            '2️⃣ Correct IP ($_flaskBase)\n'
-            '3️⃣ Same WiFi network\n\nError: $e',
-      );
-    }
+    } catch (_) {}
+
+    // Attempt 2: numeric DB primary key (userId)
+    try {
+      final res = await http
+          .get(Uri.parse('$_flaskBase/my-organizations?userId=$id'),
+          headers: headers)
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final list = _safeJson(res);
+        if (list is List) {
+          return list.map((e) => OrgAssignment.fromJson(e)).toList();
+        }
+      }
+    } catch (_) {}
+
+    return [];
   }
 
   Future<bool> canStudentPost(String studentId) async =>
@@ -576,7 +594,7 @@ class OrgPostService {
     required String category, bool isFeatured = false,
   }) async {
     final res = await http.post(Uri.parse('$_flaskBase/news/'),
-      headers: _headers,
+      headers: await _authHeaders,
       body: jsonEncode({
         'studentId': studentId, 'organizationId': organizationId,
         'title': title, 'body': body,
@@ -596,7 +614,7 @@ class OrgPostService {
     String color = '#8B1A1A',
   }) async {
     final res = await http.post(Uri.parse('$_flaskBase/events/'),
-      headers: _headers,
+      headers: await _authHeaders,
       body: jsonEncode({
         'studentId': studentId, 'organizationId': organizationId,
         'shortName': shortName, 'fullName': fullName,
@@ -816,8 +834,6 @@ class LostFoundService {
     required String status, String? base64Image,
   }) async {
     // ── Upload image first if provided ─────────────────────────────────────
-    // base64Image already has the full data URI prefix from the view
-    // (e.g. 'data:image/jpeg;base64,...') -- pass it directly, no re-wrapping.
     String? imageUrl;
     if (base64Image != null) {
       try {
@@ -825,20 +841,14 @@ class LostFoundService {
           Uri.parse('$_base/upload/image'),
           headers: await _authHeaders,
           body: jsonEncode({
-            'image': base64Image,   // already has the data URI prefix
+            'image': 'data:image/jpeg;base64,$base64Image',
             'type': 'lost_found',
           }),
         ).timeout(const Duration(seconds: 30));
         if (uploadRes.statusCode == 200) {
           imageUrl = (_safeJson(uploadRes) as Map<String, dynamic>)['url'] as String?;
-        } else {
-          debugPrint('[LostFoundService] image upload failed (${uploadRes.statusCode}), using base64 fallback');
-          imageUrl = base64Image;
         }
-      } catch (e) {
-        debugPrint('[LostFoundService] image upload error: $e -- using base64 fallback');
-        imageUrl = base64Image;
-      }
+      } catch (_) {}
     }
 
     final res = await http.post(Uri.parse('$_base/lost-found/'),
@@ -985,7 +995,9 @@ class UserService {
   }
 
   Future<UserModel> fetchProfile(String userId) async {
-    final res = await http.get(Uri.parse('$_base/users/$userId'),
+
+    final res = await http.get(
+        Uri.parse('$_base/students/profile'),
         headers: await _authHeaders)
         .timeout(const Duration(seconds: 15));
     if (res.statusCode == 200) {

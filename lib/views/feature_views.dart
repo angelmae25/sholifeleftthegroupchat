@@ -443,7 +443,7 @@ class _EventCardWithAttendState extends State<EventCardWithAttend> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(result['message'] ?? 'Could not mark attendance.'),
         backgroundColor: Colors.orange.shade700,
-        behavior: SnackBarBehavior.floating,
+        behavior: SnackBarBehavior.fixed,  // everywhere it says .floating
       ));
     }
   }
@@ -844,7 +844,7 @@ class _NewsDetailSheetState extends State<_NewsDetailSheet> {
                   style: const TextStyle(fontWeight: FontWeight.w600)),
             ]),
             backgroundColor: Colors.green.shade700,
-            behavior: SnackBarBehavior.floating,
+            behavior: SnackBarBehavior.fixed,  // everywhere it says .floating
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             duration: const Duration(seconds: 3),
           ));
