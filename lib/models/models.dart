@@ -6,6 +6,8 @@
 
 import 'package:flutter/material.dart';
 
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EVENT MODEL
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,23 +170,40 @@ class ChatModel {
   final List<ChatMessageModel> messages;
 
   const ChatModel({
-    required this.id, required this.name, required this.lastMessage,
-    required this.lastMessageAt, this.unreadCount = 0,
-    this.isGroup = false, this.messages = const [],
+    required this.id,
+    required this.name,
+    required this.lastMessage,
+    required this.lastMessageAt,
+    this.unreadCount = 0,
+    this.isGroup = false,
+    this.messages = const [],
   });
 
+  // ✅ ADDED (THIS FIXES YOUR ERROR)
+  factory ChatModel.fromJson(Map<String, dynamic> json) {
+    return ChatModel(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      lastMessage: json['lastMessage'] ?? '',
+      lastMessageAt: DateTime.tryParse(
+          json['lastMessageAt'] ?? json['updatedAt'] ?? '') ??
+          DateTime.now(),
+      unreadCount: json['unreadCount'] ?? 0,
+      isGroup: json['isGroup'] ?? false,
+      messages: (json['messages'] as List<dynamic>? ?? [])
+          .map((e) => ChatMessageModel.fromJson(e))
+          .toList(),
+    );
+  }
+
   static List<ChatModel> get mockList => [
-    ChatModel(id: 'c1', name: 'Maria Santos',      lastMessage: 'Thanks for the notes!',         lastMessageAt: DateTime.now().subtract(const Duration(minutes: 2)),  unreadCount: 3),
-    ChatModel(id: 'c2', name: 'BASD Committee',    lastMessage: 'Meeting tomorrow at 10AM',       lastMessageAt: DateTime.now().subtract(const Duration(minutes: 15)), unreadCount: 1, isGroup: true),
-    ChatModel(id: 'c3', name: 'Jose Reyes',         lastMessage: 'Can I borrow your calculator?', lastMessageAt: DateTime.now().subtract(const Duration(hours: 1))),
-    ChatModel(id: 'c4', name: 'CS Student Council', lastMessage: 'New event posted!',             lastMessageAt: DateTime.now().subtract(const Duration(hours: 2)),    unreadCount: 5, isGroup: true),
-    ChatModel(id: 'c5', name: 'Ana Dela Cruz',      lastMessage: 'See you at the library!',       lastMessageAt: DateTime.now().subtract(const Duration(hours: 3))),
+    ChatModel(id: 'c1', name: 'Maria Santos', lastMessage: 'Thanks for the notes!', lastMessageAt: DateTime.now().subtract(const Duration(minutes: 2)), unreadCount: 3),
   ];
 
   String get timeLabel {
     final diff = DateTime.now().difference(lastMessageAt);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours   < 24) return '${diff.inHours}h';
+    if (diff.inHours < 24) return '${diff.inHours}h';
     return '${diff.inDays}d';
   }
 }
@@ -197,15 +216,28 @@ class ChatMessageModel {
   final bool isMine;
 
   const ChatMessageModel({
-    required this.id, required this.text, required this.senderId,
-    required this.sentAt, required this.isMine,
+    required this.id,
+    required this.text,
+    required this.senderId,
+    required this.sentAt,
+    required this.isMine,
   });
 
+  // ✅ ADDED (THIS FIXES YOUR ERROR)
+  factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
+    return ChatMessageModel(
+      id: json['id']?.toString() ?? '',
+      text: json['text'] ?? json['message'] ?? '',
+      senderId: json['senderId']?.toString() ?? '',
+      sentAt: DateTime.tryParse(
+          json['sentAt'] ?? json['createdAt'] ?? '') ??
+          DateTime.now(),
+      isMine: json['isMine'] ?? false,
+    );
+  }
+
   static List<ChatMessageModel> get mockMessages => [
-    ChatMessageModel(id: 'msg1', text: 'Hey! Have you seen my notes?',             senderId: 'other', sentAt: DateTime.now().subtract(const Duration(minutes: 10)), isMine: false),
-    ChatMessageModel(id: 'msg2', text: 'Yes! I have them. Do you need them now?',  senderId: 'me',    sentAt: DateTime.now().subtract(const Duration(minutes: 8)),  isMine: true),
-    ChatMessageModel(id: 'msg3', text: 'That would be great! Thanks so much!',     senderId: 'other', sentAt: DateTime.now().subtract(const Duration(minutes: 7)),  isMine: false),
-    ChatMessageModel(id: 'msg4', text: 'No problem! See you at the library.',       senderId: 'me',    sentAt: DateTime.now().subtract(const Duration(minutes: 5)),  isMine: true),
+    ChatMessageModel(id: 'msg1', text: 'Hello', senderId: 'other', sentAt: DateTime.now(), isMine: false),
   ];
 
   String get timeLabel {
@@ -232,9 +264,9 @@ class ClubModel {
   });
 
   // ── NEW: build from Flask /clubs/ response ────────────────────────────────
-  factory ClubModel.fromApi(Map<String, dynamic> json) => ClubModel(
+  factory ClubModel.fromJson(Map<String, dynamic> json) => ClubModel(
     id:         json['id']?.toString() ?? '',
-    name:       json['name']    as String? ?? '',
+    name:       json['name'] as String? ?? '',
     department: json['acronym'] as String? ?? '',
     color:      const Color(0xFF8B1A1A),
     icon:       Icons.groups,
@@ -284,4 +316,6 @@ class LeaderboardEntryModel {
     const LeaderboardEntryModel(rank: 5, userId: 'u6', name: 'Lisa Cruz',     department: '1st Year Architecture',points: 3200),
     const LeaderboardEntryModel(rank: 6, userId: 'u7', name: 'Mark Tan',      department: '4th Year Commerce',    points: 2980),
   ];
+
+
 }

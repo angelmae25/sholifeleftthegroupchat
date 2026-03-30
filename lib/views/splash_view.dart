@@ -1,13 +1,20 @@
 // =============================================================================
-// VIEW: splash_view.dart  &  onboarding_view.dart
-// Splash matches the exact design: warm orange radial gradient background
-// with the combined Scholife logo (book + wordmark) animated in the center.
+// lib/views/splash_view.dart  (UPDATED)
+// Auto-login: checks SQLite session via AuthService.tryAutoLogin()
+// If a valid session exists → go to /home (skips sign-in + onboarding)
+// If no session → go to /onboarding as before
+// Also loads SettingsController (dark mode) BEFORE navigating so the
+// theme is applied immediately with no flicker.
 // =============================================================================
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import '../controllers/auth_controller.dart';
+import '../controllers/controllers.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,34 +28,25 @@ class SplashView extends StatefulWidget {
 
 class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
 
-  // Background pulse
   late AnimationController _bgCtrl;
   late Animation<double>    _bgScale;
-
-  // Logo entrance
   late AnimationController _logoCtrl;
   late Animation<double>    _logoScale;
   late Animation<double>    _logoFade;
   late Animation<double>    _logoY;
-
-  // Shimmer
   late AnimationController _shimmerCtrl;
   late Animation<double>    _shimmerAnim;
-
-  // Loading dots
   late AnimationController _dotsCtrl;
 
   @override
   void initState() {
     super.initState();
 
-    // Background gentle breathe
     _bgCtrl   = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))
       ..repeat(reverse: true);
     _bgScale  = Tween<double>(begin: 1.0, end: 1.08)
         .animate(CurvedAnimation(parent: _bgCtrl, curve: Curves.easeInOut));
 
-    // Logo spring entrance
     _logoCtrl  = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
     _logoScale = Tween<double>(begin: 0.0, end: 1.0)
         .animate(CurvedAnimation(parent: _logoCtrl, curve: Curves.elasticOut));
@@ -57,12 +55,10 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
     _logoY     = Tween<double>(begin: 60.0, end: 0.0)
         .animate(CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOutCubic));
 
-    // Shimmer sweep across logo
     _shimmerCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
     _shimmerAnim = Tween<double>(begin: -1.5, end: 2.0)
         .animate(CurvedAnimation(parent: _shimmerCtrl, curve: Curves.easeInOut));
 
-    // Pulsing dots
     _dotsCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
       ..repeat(reverse: true);
 
@@ -70,15 +66,31 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
   }
 
   Future<void> _runSequence() async {
-    // Short pause, then logo bounces in
+    // 1. Load settings first (dark mode) so theme applies before navigation
+    if (mounted) {
+      await context.read<SettingsController>().loadSettings();
+    }
+
+    // 2. Play logo animation
     await Future.delayed(const Duration(milliseconds: 300));
     await _logoCtrl.forward();
-    // Shimmer sweep
     await Future.delayed(const Duration(milliseconds: 100));
     await _shimmerCtrl.forward();
-    // Hold, then navigate
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (mounted) context.go('/onboarding');
+
+    // 3. Check SQLite for saved session (auto-login)
+    final user = await AuthService.instance.tryAutoLogin();
+
+    // 4. Navigate
+    if (!mounted) return;
+
+    if (user != null) {
+      // Restore the user into AuthController so the whole app has it
+      context.read<AuthController>().restoreSession(user);
+      context.go('/home');
+    } else {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) context.go('/onboarding');
+    }
   }
 
   @override
@@ -100,21 +112,18 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
             width: double.infinity,
             height: double.infinity,
             decoration: BoxDecoration(
-              // Deep maroon gradient — logo has transparent bg now
               gradient: RadialGradient(
                 center: Alignment.center,
                 radius: _bgScale.value,
                 colors: const [
-                  Color(0xFF3D0505), // maroon center
-                  Color(0xFF6B0F0F), // deep maroon mid
-                  Color(0xFF0D0000), // near-black edge
+                  Color(0xFF3D0505),
+                  Color(0xFF6B0F0F),
+                  Color(0xFF0D0000),
                 ],
                 stops: const [0.0, 0.55, 1.0],
               ),
             ),
             child: Stack(children: [
-
-              // ── Soft radial highlight top-center ────────────────────────
               Positioned(
                 top: -60, left: 0, right: 0,
                 child: Center(
@@ -129,12 +138,8 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-
-              // ── Main content ─────────────────────────────────────────────
               Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-
-                  // ── Animated logo ────────────────────────────────────────
                   Transform.translate(
                     offset: Offset(0, _logoY.value),
                     child: Opacity(
@@ -145,18 +150,13 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 48),
-
-                  // ── Pulsing dots ─────────────────────────────────────────
                   Opacity(
                     opacity: _logoFade.value.clamp(0.0, 1.0),
                     child: _PulsingDots(controller: _dotsCtrl),
                   ),
                 ]),
               ),
-
-              // ── Bottom tagline ────────────────────────────────────────────
               Positioned(
                 bottom: 48, left: 0, right: 0,
                 child: Opacity(
@@ -191,7 +191,6 @@ class _LogoWithShimmer extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Drop shadow behind logo
         Container(
           width: 290, height: 290,
           decoration: BoxDecoration(
@@ -199,24 +198,17 @@ class _LogoWithShimmer extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.15),
-                blurRadius: 40,
-                spreadRadius: 5,
+                blurRadius: 40, spreadRadius: 5,
                 offset: const Offset(0, 10),
               ),
             ],
           ),
         ),
-
-        // The combined splash logo (icon + wordmark on orange bg)
         Image.asset(
           'assets/images/splash_logo.png',
-          width: 280,
-          height: 280,
-          fit: BoxFit.contain,
+          width: 280, height: 280, fit: BoxFit.contain,
           errorBuilder: (_, __, ___) => _FallbackLogo(),
         ),
-
-        // Shimmer sweep
         if (shimmerValue > -1.0 && shimmerValue < 1.8)
           Positioned.fill(
             child: ClipRect(
@@ -227,16 +219,13 @@ class _LogoWithShimmer extends StatelessWidget {
                   child: Transform.rotate(
                     angle: 0.35,
                     child: Container(
-                      width: 55,
-                      height: 320,
+                      width: 55, height: 320,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white.withOpacity(0.0),
-                            Colors.white.withOpacity(0.28),
-                            Colors.white.withOpacity(0.0),
-                          ],
-                        ),
+                        gradient: LinearGradient(colors: [
+                          Colors.white.withOpacity(0.0),
+                          Colors.white.withOpacity(0.28),
+                          Colors.white.withOpacity(0.0),
+                        ]),
                       ),
                     ),
                   ),
@@ -249,7 +238,6 @@ class _LogoWithShimmer extends StatelessWidget {
   }
 }
 
-// ── Fallback if image asset is missing ───────────────────────────────────────
 class _FallbackLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -258,10 +246,8 @@ class _FallbackLogo extends StatelessWidget {
         width: 160, height: 160,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: const RadialGradient(
-              colors: [Color(0xFFFF8C00), Color(0xFF8B0000)]),
-          boxShadow: [BoxShadow(
-              color: Colors.black.withOpacity(0.2), blurRadius: 20)],
+          gradient: const RadialGradient(colors: [Color(0xFFFF8C00), Color(0xFF8B0000)]),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20)],
         ),
         child: const Icon(Icons.menu_book, size: 80, color: Colors.white),
       ),
@@ -275,7 +261,6 @@ class _FallbackLogo extends StatelessWidget {
   }
 }
 
-// ── Pulsing dots ──────────────────────────────────────────────────────────────
 class _PulsingDots extends StatelessWidget {
   final AnimationController controller;
   const _PulsingDots({required this.controller});
@@ -306,7 +291,7 @@ class _PulsingDots extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ONBOARDING VIEW
+// ONBOARDING VIEW (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key});
@@ -334,7 +319,6 @@ class _OnboardingViewState extends State<OnboardingView> {
         ),
       ),
       child: SafeArea(child: Column(children: [
-        // Top bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(children: [
@@ -355,8 +339,6 @@ class _OnboardingViewState extends State<OnboardingView> {
                 child: const Text('Skip', style: TextStyle(color: AppTheme.textOnDarkMuted))),
           ]),
         ),
-
-        // Pages
         Expanded(
           child: PageView.builder(
             controller: _ctrl, itemCount: _pages.length,
@@ -364,14 +346,12 @@ class _OnboardingViewState extends State<OnboardingView> {
             itemBuilder: (_, i) => _OnboardPage(data: _pages[i]),
           ),
         ),
-
         SmoothPageIndicator(
             controller: _ctrl, count: _pages.length,
             effect: const ExpandingDotsEffect(
                 activeDotColor: AppTheme.accent, dotColor: Colors.white30,
                 dotHeight: 8, dotWidth: 8, expansionFactor: 3)),
         const SizedBox(height: 32),
-
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: SizedBox(width: double.infinity,

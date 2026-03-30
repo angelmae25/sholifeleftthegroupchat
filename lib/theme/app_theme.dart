@@ -96,6 +96,7 @@ class AppTheme {
           ? const Color(0x668B1A1A)
           : const Color(0x4D9E9E9E)),
     ),
+    drawerTheme: const DrawerThemeData(backgroundColor: sidebarBg),
     dividerColor: divider,
   );
 

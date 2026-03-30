@@ -9,13 +9,10 @@
 // =============================================================================
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/news_model.dart';
 import '../models/models.dart';
 import '../models/user_model.dart';
-import '../services/data_service.dart';
-import '../services/chat_socket_service.dart'; // ← NEW
-
+import '../services/all_services.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // NEWS CONTROLLER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,6 +142,8 @@ class MarketplaceController extends ChangeNotifier {
     }
   }
 
+  // REMOVED: contactNumber & paymentMethods — no longer part of the item model.
+  // base64Image is passed directly (already includes "data:image/jpeg;base64,...").
   Future<bool> createItem({
     required String name,
     required String description,
@@ -159,7 +158,7 @@ class MarketplaceController extends ChangeNotifier {
         description: description,
         condition:   condition,
         price:       price,
-        base64Image: base64Image,
+        base64Image: base64Image, // already includes "data:image/jpeg;base64,..."
       );
       _items = [newItem, ..._items];
       _error = null;
@@ -206,6 +205,7 @@ class LostFoundController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // base64Image is passed directly (already includes "data:image/jpeg;base64,...").
   Future<bool> reportItem({
     required String title,
     required String description,
@@ -222,7 +222,7 @@ class LostFoundController extends ChangeNotifier {
         location:    location,
         date:        date,
         status:      status,
-        base64Image: base64Image,
+        base64Image: base64Image, // already includes "data:image/jpeg;base64,..."
       );
       _items = [newItem, ..._items];
       _error = null;
@@ -239,31 +239,14 @@ class LostFoundController extends ChangeNotifier {
 // ─────────────────────────────────────────────────────────────────────────────
 // CHAT CONTROLLER  — UPDATED with real-time Socket.IO support
 // ─────────────────────────────────────────────────────────────────────────────
-// =============================================================================
-// REPLACE loadConversations() and the onNewMessage handler in ChatController
-// inside lib/controllers/controllers.dart
-//
-// The fix: determine is_mine by comparing sender_id to the logged-in user's id.
-// This ensures Jemuel sees his own message as "mine" and Cain sees it as
-// "incoming" — both sides show the conversation correctly.
-// =============================================================================
-
-// Add this import at the top of controllers.dart if not already there:
-// import '../controllers/auth_controller.dart';
-
-// REPLACE the entire ChatController class with this:
-
 class ChatController extends ChangeNotifier {
   List<ChatModel>        _conversations = [];
   List<ChatMessageModel> _messages      = [];
   String?                _activeConvId;
   bool                   _isLoading     = false;
   String?                _error;
-  String                 _myId          = '';  // ← ADD THIS FIELD
+  String                 _myId          = '';
 
-  // ... existing getters ...
-
-  // ← ADD THIS METHOD
   void setMyId(String id) {
     _myId = id;
   }
@@ -286,7 +269,7 @@ class ChatController extends ChangeNotifier {
       ChatSocketService.instance.onNewMessage = (msg) {
         final incomingConvId = msg['conversation_id']?.toString() ?? '';
         final senderId       = msg['sender_id']?.toString()       ?? '';
-        final isMine         = senderId == _myId;  // ← uses _myId
+        final isMine         = senderId == _myId;
 
         if (_activeConvId != null && incomingConvId == _activeConvId) {
           final alreadyExists = _messages.any(
@@ -321,14 +304,6 @@ class ChatController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  // Lightweight refresh of conversation list without full reload
-  Future<void> _refreshConversationList() async {
-    try {
-      _conversations = await ChatService.instance.fetchConversations();
-      notifyListeners();
-    } catch (_) {}
-  }
-
   // ── Open a conversation ───────────────────────────────────────────────────
   Future<void> openConversation(String conversationId) async {
     _activeConvId = conversationId;
@@ -349,7 +324,7 @@ class ChatController extends ChangeNotifier {
     final optimistic = ChatMessageModel(
       id:       'opt_${DateTime.now().millisecondsSinceEpoch}',
       text:     text.trim(),
-      senderId: _myId,       // ← uses _myId instead of 'me'
+      senderId: _myId,
       sentAt:   DateTime.now(),
       isMine:   true,
     );
@@ -359,8 +334,7 @@ class ChatController extends ChangeNotifier {
   }
 
   // ── Start DM ──────────────────────────────────────────────────────────────
-  void startDm(String otherStudentId, void Function(String convId) onReady) {
-    ChatSocketService.instance.onDmReady = onReady;
+  void startDm(String otherStudentId) {
     ChatSocketService.instance.startDm(otherStudentId);
   }
 
@@ -372,21 +346,6 @@ class ChatController extends ChangeNotifier {
   }
 }
 
-// =============================================================================
-// Also update ChatView.initState() in secondary_views.dart:
-// Pass the logged-in user's id when loading conversations.
-//
-// REPLACE the initState in _ChatViewState with:
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     WidgetsBinding.instance.addPostFrameCallback((_) {
-//       final myId = context.read<AuthController>().user?.id ?? '';
-//       context.read<ChatController>().loadConversations(myId: myId);
-//     });
-//   }
-// =============================================================================
 // ─────────────────────────────────────────────────────────────────────────────
 // CLUBS CONTROLLER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -412,7 +371,7 @@ class ClubsController extends ChangeNotifier {
   }
 
   Future<void> toggleMembership(String clubId) async {
-    // Orgs from Spring Boot are read-only — skip toggle
+    // Organizations from Spring Boot are read-only — skip toggle
     if (clubId.startsWith('org_')) return;
 
     final idx = _clubs.indexWhere((c) => c.id == clubId);
@@ -490,23 +449,24 @@ class ProfileController extends ChangeNotifier {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SETTINGS CONTROLLER
-// Persists all toggles to SharedPreferences so they survive app restarts.
+// Persists all toggles to SQLite (DatabaseService) so they survive app restarts.
 // ─────────────────────────────────────────────────────────────────────────────
 class SettingsController extends ChangeNotifier {
-  // ── Preference keys ────────────────────────────────────────────────────────
-  static const _kPush             = 'pref_push_notifications';
-  static const _kEmail            = 'pref_email_alerts';
-  static const _kDarkMode         = 'pref_dark_mode';
-  static const _kLocation         = 'pref_location_access';
-  static const _kNotifNews        = 'pref_notif_news';
-  static const _kNotifEvents      = 'pref_notif_events';
-  static const _kNotifLostFound   = 'pref_notif_lost_found';
-  static const _kNotifMarketplace = 'pref_notif_marketplace';
 
-  // ── In-memory state (defaults shown) ──────────────────────────────────────
+  // ── SQLite column key constants ────────────────────────────────────────────
+  static const _kDarkMode         = 'dark_mode';
+  static const _kPush             = 'push_notifications';
+  static const _kEmail            = 'email_alerts';
+  static const _kLocation         = 'location_access';
+  static const _kNotifNews        = 'notif_news';
+  static const _kNotifEvents      = 'notif_events';
+  static const _kNotifLostFound   = 'notif_lost_found';
+  static const _kNotifMarketplace = 'notif_marketplace';
+
+  // ── In-memory state (defaults) ─────────────────────────────────────────────
+  bool _darkMode          = false;
   bool _pushNotifications = true;
   bool _emailAlerts       = false;
-  bool _darkMode          = false;
   bool _locationAccess    = true;
   bool _notifNews         = true;
   bool _notifEvents       = true;
@@ -514,42 +474,84 @@ class SettingsController extends ChangeNotifier {
   bool _notifMarketplace  = true;
 
   // ── Getters ────────────────────────────────────────────────────────────────
+  bool get darkMode          => _darkMode;
   bool get pushNotifications => _pushNotifications;
   bool get emailAlerts       => _emailAlerts;
-  bool get darkMode          => _darkMode;
   bool get locationAccess    => _locationAccess;
   bool get notifNews         => _notifNews;
   bool get notifEvents       => _notifEvents;
   bool get notifLostFound    => _notifLostFound;
   bool get notifMarketplace  => _notifMarketplace;
 
-  // ── Setters (each notifies + persists immediately) ─────────────────────────
-  void setPushNotifications(bool v) { _pushNotifications = v; notifyListeners(); _save(_kPush, v); }
-  void setEmailAlerts(bool v)       { _emailAlerts = v;       notifyListeners(); _save(_kEmail, v); }
-  void setDarkMode(bool v)          { _darkMode = v;          notifyListeners(); _save(_kDarkMode, v); }
-  void setLocationAccess(bool v)    { _locationAccess = v;    notifyListeners(); _save(_kLocation, v); }
-  void setNotifNews(bool v)         { _notifNews = v;         notifyListeners(); _save(_kNotifNews, v); }
-  void setNotifEvents(bool v)       { _notifEvents = v;       notifyListeners(); _save(_kNotifEvents, v); }
-  void setNotifLostFound(bool v)    { _notifLostFound = v;    notifyListeners(); _save(_kNotifLostFound, v); }
-  void setNotifMarketplace(bool v)  { _notifMarketplace = v;  notifyListeners(); _save(_kNotifMarketplace, v); }
-
-  // ── Load persisted settings on app start ──────────────────────────────────
-  Future<void> loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    _pushNotifications = prefs.getBool(_kPush)              ?? true;
-    _emailAlerts       = prefs.getBool(_kEmail)             ?? false;
-    _darkMode          = prefs.getBool(_kDarkMode)          ?? false;
-    _locationAccess    = prefs.getBool(_kLocation)          ?? true;
-    _notifNews         = prefs.getBool(_kNotifNews)         ?? true;
-    _notifEvents       = prefs.getBool(_kNotifEvents)       ?? true;
-    _notifLostFound    = prefs.getBool(_kNotifLostFound)    ?? true;
-    _notifMarketplace  = prefs.getBool(_kNotifMarketplace)  ?? true;
+  // ── Setters — each immediately writes to SQLite ───────────────────────────
+  void setDarkMode(bool v) {
+    _darkMode = v;
     notifyListeners();
+    DatabaseService.instance.saveSetting(_kDarkMode, v);
   }
 
-  // ── Internal: fire-and-forget save ────────────────────────────────────────
-  Future<void> _save(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
+  void setPushNotifications(bool v) {
+    _pushNotifications = v;
+    notifyListeners();
+    DatabaseService.instance.saveSetting(_kPush, v);
+  }
+
+  void setEmailAlerts(bool v) {
+    _emailAlerts = v;
+    notifyListeners();
+    DatabaseService.instance.saveSetting(_kEmail, v);
+  }
+
+  void setLocationAccess(bool v) {
+    _locationAccess = v;
+    notifyListeners();
+    DatabaseService.instance.saveSetting(_kLocation, v);
+  }
+
+  void setNotifNews(bool v) {
+    _notifNews = v;
+    notifyListeners();
+    DatabaseService.instance.saveSetting(_kNotifNews, v);
+  }
+
+  void setNotifEvents(bool v) {
+    _notifEvents = v;
+    notifyListeners();
+    DatabaseService.instance.saveSetting(_kNotifEvents, v);
+  }
+
+  void setNotifLostFound(bool v) {
+    _notifLostFound = v;
+    notifyListeners();
+    DatabaseService.instance.saveSetting(_kNotifLostFound, v);
+  }
+
+  void setNotifMarketplace(bool v) {
+    _notifMarketplace = v;
+    notifyListeners();
+    DatabaseService.instance.saveSetting(_kNotifMarketplace, v);
+  }
+
+  // ── Seed dark mode instantly (called from main() before runApp) ───────────
+  /// Sets darkMode in-memory only — no async, no DB call.
+  /// Used to prevent flicker: main() reads dark_mode from SQLite before
+  /// runApp(), then passes it here so the theme is correct on first frame.
+  void seedDarkMode(bool value) {
+    _darkMode = value;
+    // No notifyListeners() needed here — called before the widget tree exists
+  }
+
+  // ── Load all settings from SQLite on app start ─────────────────────────────
+  Future<void> loadSettings() async {
+    final row = await DatabaseService.instance.loadSettings();
+    _darkMode          = (row[_kDarkMode]         as int? ?? 0) == 1;
+    _pushNotifications = (row[_kPush]             as int? ?? 1) == 1;
+    _emailAlerts       = (row[_kEmail]            as int? ?? 0) == 1;
+    _locationAccess    = (row[_kLocation]         as int? ?? 1) == 1;
+    _notifNews         = (row[_kNotifNews]        as int? ?? 1) == 1;
+    _notifEvents       = (row[_kNotifEvents]      as int? ?? 1) == 1;
+    _notifLostFound    = (row[_kNotifLostFound]   as int? ?? 1) == 1;
+    _notifMarketplace  = (row[_kNotifMarketplace] as int? ?? 1) == 1;
+    notifyListeners();
   }
 }

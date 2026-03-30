@@ -1,33 +1,36 @@
 // =============================================================================
-// CONTROLLER: auth_controller.dart
-// Manages authentication state. Notifies the View via ChangeNotifier.
-// The View (screen) never touches AuthService directly — it only calls
-// methods on this controller and reacts to state changes.
+// CONTROLLER: auth_controller.dart  (UPDATED)
+// Added: restoreSession() — called by SplashView after SQLite auto-login
 // =============================================================================
 
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
-/// Represents all possible auth states
 enum AuthStatus { idle, loading, authenticated, error }
 
 class AuthController extends ChangeNotifier {
-  // ── State ──────────────────────────────────────────────────────────────────
   AuthStatus _status  = AuthStatus.idle;
   UserModel? _user;
   String?    _errorMessage;
 
-  // ── Getters (View reads these) ─────────────────────────────────────────────
   AuthStatus  get status       => _status;
   UserModel?  get user         => _user;
   String?     get errorMessage => _errorMessage;
   bool        get isLoading    => _status == AuthStatus.loading;
   bool        get isLoggedIn   => _status == AuthStatus.authenticated && _user != null;
 
-  // ── Actions (View calls these) ─────────────────────────────────────────────
+  // ── Restore session from SQLite (called by SplashView) ────────────────────
+  /// Sets the controller to authenticated state without a network call.
+  /// Used when the user has a valid saved session in SQLite.
+  void restoreSession(UserModel user) {
+    _user   = user;
+    _status = AuthStatus.authenticated;
+    _errorMessage = null;
+    notifyListeners();
+  }
 
-  /// Sign in with email and password
+  // ── Sign In ────────────────────────────────────────────────────────────────
   Future<bool> signIn(String email, String password) async {
     _setLoading();
     try {
@@ -42,7 +45,7 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Register a new account
+  // ── Register ───────────────────────────────────────────────────────────────
   Future<bool> register({
     required String fullName,
     required String studentId,
@@ -73,7 +76,7 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Sign out
+  // ── Sign Out ───────────────────────────────────────────────────────────────
   Future<void> signOut() async {
     _setLoading();
     await AuthService.instance.signOut();
@@ -82,24 +85,29 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Called after profile update to keep the drawer/header in sync
+  // ── Refresh user after profile update ─────────────────────────────────────
   void refreshUser(UserModel updated) {
     _user = updated;
     notifyListeners();
+    // Also update SQLite cache
+    AuthService.instance.updateCachedProfile(
+      avatarUrl: updated.avatarUrl,
+      points:    updated.points,
+      fullName:  updated.fullName,
+      course:    updated.course,
+      yearLevel: updated.yearLevel,
+    );
   }
 
-  /// Called after earning points (read news, attend event) to update
-  /// the displayed points in the profile/leaderboard without a full reload.
+  // ── Refresh points only ────────────────────────────────────────────────────
   void refreshPoints(int newPoints) {
     if (_user == null) return;
     _user = _user!.copyWith(points: newPoints);
     notifyListeners();
+    AuthService.instance.updateCachedProfile(points: newPoints);
   }
 
-  // ── Change Password ─────────────────────────────────────────────────────────
-  /// Verifies current password then updates to new password.
-  /// Returns true on success, false on failure.
-  /// On failure, errorMessage is set so the View can display it.
+  // ── Change Password ────────────────────────────────────────────────────────
   Future<bool> changePassword({
     required String current,
     required String newPassword,
@@ -110,7 +118,6 @@ class AuthController extends ChangeNotifier {
         current:     current,
         newPassword: newPassword,
       );
-      // Stay authenticated — just clear loading state
       _status       = AuthStatus.authenticated;
       _errorMessage = null;
       notifyListeners();
@@ -121,15 +128,11 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // ── Save FCM Token ──────────────────────────────────────────────────────────
-  /// Sends the Firebase device token to Flask so push notifications work.
-  /// Called once on app start after Firebase initializes.
-  /// Fails silently — a missing FCM token should never block the user.
+  // ── Save FCM Token ─────────────────────────────────────────────────────────
   Future<void> saveFcmToken(String token) async {
     try {
       await AuthService.instance.saveFcmToken(token);
     } catch (e) {
-      // Non-critical — just log it
       debugPrint('[AuthController] FCM token save failed: $e');
     }
   }

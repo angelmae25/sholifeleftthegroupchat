@@ -39,73 +39,76 @@ class _HomeViewState extends State<HomeView> {
     final textSubClr = AppTheme.textSub(context);
     return AppScaffold(
       title: 'Home', currentRoute: '/home',
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Consumer<AuthController>(builder: (_, auth, __) {
-            final name = auth.user?.fullName ?? 'Student';
-            final info = auth.user != null ? '${auth.user!.yearLevel} · ${auth.user!.course}' : '';
-            return Container(
-              width: double.infinity, padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppTheme.primaryDark, AppTheme.primary]),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // ← FIXED: Colors.white70 not AppTheme.cardColor(context)70
-                const Text('Good day, 👋', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
-                if (info.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(color: AppTheme.accent, borderRadius: BorderRadius.circular(20)),
-                    child: Text(info, style: const TextStyle(color: AppTheme.primaryDark, fontSize: 12, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ]),
-            );
-          }),
-          const SizedBox(height: 20),
-          _SectionHeader(title: 'Quick Access'),
-          const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 4, shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12, crossAxisSpacing: 12,
-            children: [
-              _QuickBtn(icon: Icons.newspaper_outlined,   label: 'News',    route: '/news'),
-              _QuickBtn(icon: Icons.event_outlined,       label: 'Events',  route: '/events'),
-              _QuickBtn(icon: Icons.store_outlined,       label: 'Market',  route: '/marketplace'),
-              _QuickBtn(icon: Icons.search_outlined,      label: 'Lost',    route: '/lost-found'),
-              _QuickBtn(icon: Icons.chat_bubble_outline,  label: 'Chat',    route: '/chat'),
-              _QuickBtn(icon: Icons.groups_outlined,      label: 'Clubs',   route: '/clubs'),
-              _QuickBtn(icon: Icons.leaderboard_outlined, label: 'Board',   route: '/leaderboard'),
-              _QuickBtn(icon: Icons.person_outline,       label: 'Profile', route: '/profile'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionHeader(title: 'Latest News', onSeeAll: () => context.go('/news')),
-          const SizedBox(height: 8),
-          Consumer<NewsController>(builder: (_, ctrl, __) {
-            if (ctrl.isLoading) return const _LoadingCard();
-            final articles = ctrl.articles.take(2).toList();
-            return Column(children: articles.map((a) => _NewsCard(article: a)).toList());
-          }),
-          const SizedBox(height: 20),
-          _SectionHeader(title: 'Upcoming Events', onSeeAll: () => context.go('/events')),
-          const SizedBox(height: 8),
-          Consumer<EventsController>(builder: (_, ctrl, __) {
-            if (ctrl.isLoading) return const _LoadingCard();
-            return SizedBox(
-              height: 130,
-              child: ListView(scrollDirection: Axis.horizontal,
-                  children: ctrl.events.map((e) => _EventMiniCard(event: e)).toList()),
-            );
-          }),
-          const SizedBox(height: 20),
-        ]),
+      body: Container(
+        color: AppTheme.pageColor(context),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Consumer<AuthController>(builder: (_, auth, __) {
+              final name = auth.user?.fullName ?? 'Student';
+              final info = auth.user != null ? '${auth.user!.yearLevel} · ${auth.user!.course}' : '';
+              return Container(
+                width: double.infinity, padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [AppTheme.primaryDark, AppTheme.primary]),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // ← FIXED: Colors.white70 not AppTheme.cardColor(context)70
+                  const Text('Good day, 👋', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text(name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                  if (info.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(color: AppTheme.accent, borderRadius: BorderRadius.circular(20)),
+                      child: Text(info, style: const TextStyle(color: AppTheme.primaryDark, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ]),
+              );
+            }),
+            const SizedBox(height: 20),
+            _SectionHeader(title: 'Quick Access'),
+            const SizedBox(height: 12),
+            GridView.count(
+              crossAxisCount: 4, shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12, crossAxisSpacing: 12,
+              children: [
+                _QuickBtn(icon: Icons.newspaper_outlined,   label: 'News',    route: '/news'),
+                _QuickBtn(icon: Icons.event_outlined,       label: 'Events',  route: '/events'),
+                _QuickBtn(icon: Icons.store_outlined,       label: 'Market',  route: '/marketplace'),
+                _QuickBtn(icon: Icons.search_outlined,      label: 'Lost',    route: '/lost-found'),
+                _QuickBtn(icon: Icons.chat_bubble_outline,  label: 'Chat',    route: '/chat'),
+                _QuickBtn(icon: Icons.groups_outlined,      label: 'Clubs',   route: '/clubs'),
+                _QuickBtn(icon: Icons.leaderboard_outlined, label: 'Board',   route: '/leaderboard'),
+                _QuickBtn(icon: Icons.person_outline,       label: 'Profile', route: '/profile'),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionHeader(title: 'Latest News', onSeeAll: () => context.go('/news')),
+            const SizedBox(height: 8),
+            Consumer<NewsController>(builder: (_, ctrl, __) {
+              if (ctrl.isLoading) return const _LoadingCard();
+              final articles = ctrl.articles.take(2).toList();
+              return Column(children: articles.map((a) => _NewsCard(article: a)).toList());
+            }),
+            const SizedBox(height: 20),
+            _SectionHeader(title: 'Upcoming Events', onSeeAll: () => context.go('/events')),
+            const SizedBox(height: 8),
+            Consumer<EventsController>(builder: (_, ctrl, __) {
+              if (ctrl.isLoading) return const _LoadingCard();
+              return SizedBox(
+                height: 130,
+                child: ListView(scrollDirection: Axis.horizontal,
+                    children: ctrl.events.map((e) => _EventMiniCard(event: e)).toList()),
+              );
+            }),
+            const SizedBox(height: 20),
+          ]),
+        ),
       ),
     );
   }
@@ -131,10 +134,11 @@ class _NewsViewState extends State<NewsView> {
 
       context.read<NewsController>().loadArticles();
 
-      final studentId =
-          context.read<AuthController>().user?.studentId ?? '';
+      final user = context.read<AuthController>().user;
+      final studentId = user?.studentId ?? '';
+      final dbId = user?.id ?? '';
 
-      context.read<OrgPostController>().loadMyOrganizations(studentId);
+      context.read<OrgPostController>().loadMyOrganizations(studentId, dbId: dbId);
 
     });
   }
@@ -167,7 +171,7 @@ class _NewsViewState extends State<NewsView> {
             title: const Text("SchoLife"),
           ),
 
-          drawer: _buildDrawer(context, '/news'),
+          drawer: AppDrawer(currentRoute: '/news'),
 
           floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
           floatingActionButton: FloatingActionButton(
@@ -286,8 +290,10 @@ class _EventsViewState extends State<EventsView> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<EventsController>().loadEvents();
-      final studentId = context.read<AuthController>().user?.studentId ?? '';
-      context.read<OrgPostController>().loadMyOrganizations(studentId);
+      final user = context.read<AuthController>().user;
+      final studentId = user?.studentId ?? '';
+      final dbId = user?.id ?? '';
+      context.read<OrgPostController>().loadMyOrganizations(studentId, dbId: dbId);
     });
   }
 
@@ -321,7 +327,7 @@ class _EventsViewState extends State<EventsView> {
               ),
             ],
           ),
-          drawer: _buildDrawer(context, '/events'),
+          drawer: AppDrawer(currentRoute: '/events'),
           floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
           floatingActionButton: hasRole
               ? FloatingActionButton(
@@ -352,99 +358,6 @@ class _EventsViewState extends State<EventsView> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DRAWER BUILDER
-// ─────────────────────────────────────────────────────────────────────────────
-Widget _buildDrawer(BuildContext context, String currentRoute) {
-  const navItems = [
-    (Icons.home_outlined,        'Home',            '/home'),
-    (Icons.newspaper_outlined,   'News',            '/news'),
-    (Icons.event_outlined,       'Events',          '/events'),
-    (Icons.store_outlined,       'Pre-loved Items', '/marketplace'),
-    (Icons.search_outlined,      'Lost & Found',    '/lost-found'),
-    (Icons.chat_bubble_outline,  'Chat',            '/chat'),
-    (Icons.groups_outlined,      'Clubs',           '/clubs'),
-    (Icons.leaderboard_outlined, 'Leaderboard',     '/leaderboard'),
-    (Icons.person_outline,       'Profile',         '/profile'),
-    (Icons.settings_outlined,    'Settings',        '/settings'),
-  ];
-  return Drawer(
-    backgroundColor: AppTheme.sidebarBg,
-    child: SafeArea(
-      child: Column(children: [
-        Consumer<AuthController>(
-          builder: (_, auth, __) => Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            child: Column(children: [
-              Image.asset('assets/images/splash_logo.png', height: 64,
-                  errorBuilder: (_, __, ___) => const CircleAvatar(
-                    radius: 32, backgroundColor: AppTheme.accentLight,
-                    child: Icon(Icons.menu_book, size: 36, color: AppTheme.primaryDark),
-                  )),
-              const SizedBox(height: 10),
-              Text(auth.user?.fullName ?? 'Student',
-                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
-              if ((auth.user?.email ?? '').isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(auth.user!.email,
-                    style: const TextStyle(color: AppTheme.textOnDarkMuted, fontSize: 12)),
-              ],
-            ]),
-          ),
-        ),
-        const Divider(color: Colors.white24),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            children: navItems.map((item) => _DrawerNavItem(
-              icon: item.$1, label: item.$2, route: item.$3, current: currentRoute,
-            )).toList(),
-          ),
-        ),
-        const Divider(color: Colors.white24),
-        ListTile(
-          leading: Icon(Icons.logout, color: Colors.redAccent[100], size: 22),
-          title: Text('Sign Out',
-              style: TextStyle(color: Colors.redAccent[100], fontWeight: FontWeight.w600, fontSize: 14)),
-          onTap: () async {
-            Navigator.pop(context);
-            await context.read<AuthController>().signOut();
-            if (context.mounted) context.go('/sign-in');
-          },
-        ),
-        const SizedBox(height: 12),
-      ]),
-    ),
-  );
-}
-
-class _DrawerNavItem extends StatelessWidget {
-  final IconData icon;
-  final String label, route, current;
-  const _DrawerNavItem({required this.icon, required this.label, required this.route, required this.current});
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = current == route;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        // ← FIXED: Colors.white.withValues not AppTheme.cardColor(context).withOpacity
-        color: isActive ? Colors.white.withValues(alpha: 0.2) : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: ListTile(
-        dense: true,
-        leading: Icon(icon, color: isActive ? Colors.white : AppTheme.textOnDarkMuted, size: 22),
-        title: Text(label, style: TextStyle(
-          color: isActive ? Colors.white : AppTheme.textOnDarkMuted,
-          fontWeight: isActive ? FontWeight.w700 : FontWeight.w400, fontSize: 14,
-        )),
-        onTap: () { Navigator.pop(context); context.go(route); },
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ORG ROLE BANNER
@@ -971,7 +884,7 @@ class _NewsDetailSheetState extends State<_NewsDetailSheet> {
           margin: const EdgeInsets.only(top: 12),
           width: 40, height: 4,
           decoration: BoxDecoration(
-            color: Colors.grey.shade300,
+            color: Colors.grey.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -1107,7 +1020,7 @@ class _NewsDetailSheetState extends State<_NewsDetailSheet> {
               ),
 
               const SizedBox(height: 24),
-              Divider(color: Colors.grey.shade200),
+              Divider(color: AppTheme.borderCol(context)),
               const SizedBox(height: 12),
 
               // footer: posted by + category

@@ -29,7 +29,7 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.surface,
+      backgroundColor: AppTheme.pageColor(context),
       appBar: AppBar(
         title: _LogoTitle(),
         actions: [
@@ -49,7 +49,7 @@ class AppScaffold extends StatelessWidget {
           ),
         ],
       ),
-      drawer: _AppDrawer(currentRoute: currentRoute),
+      drawer: AppDrawer(currentRoute: currentRoute),
       body: body,
       floatingActionButton: floatingActionButton,
     );
@@ -109,9 +109,9 @@ class _LogoTitle extends StatelessWidget {
   );
 }
 
-class _AppDrawer extends StatelessWidget {
+class AppDrawer extends StatelessWidget {
   final String currentRoute;
-  const _AppDrawer({required this.currentRoute});
+  const AppDrawer({required this.currentRoute});
 
   static const _navItems = [
     (Icons.home_outlined,           'Home',            '/home'),
@@ -128,15 +128,24 @@ class _AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark      = AppTheme.isDark(context);
+    final drawerBg    = isDark ? AppTheme.fbDarkCard    : AppTheme.sidebarBg;
+    final headerBg    = isDark ? AppTheme.fbDarkBg      : AppTheme.primaryDark;
+    final nameClr     = isDark ? AppTheme.fbDarkTextMain : Colors.white;
+    final emailClr    = isDark ? AppTheme.fbDarkTextSub  : AppTheme.textOnDarkMuted;
+    final dividerClr  = isDark ? AppTheme.fbDarkDivider  : Colors.white24;
+
     return Drawer(
-      backgroundColor: AppTheme.sidebarBg,
+      backgroundColor: drawerBg,
       child: SafeArea(
         child: Column(
           children: [
             // ── User header with real avatar ─────────────────────────────────
             Consumer<AuthController>(
               builder: (_, auth, __) => Container(
+                width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                decoration: BoxDecoration(color: headerBg),
                 child: Column(children: [
                   // ── Avatar ─────────────────────────────────────────────────
                   GestureDetector(
@@ -146,7 +155,7 @@ class _AppDrawer extends StatelessWidget {
                     },
                     child: Stack(
                       children: [
-                        _DrawerAvatar(avatarUrl: auth.user?.avatarUrl),
+                        DrawerAvatar(avatarUrl: auth.user?.avatarUrl),
                         Positioned(
                           bottom: 0, right: 0,
                           child: Container(
@@ -164,8 +173,8 @@ class _AppDrawer extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     auth.user?.fullName ?? 'Student',
-                    style: const TextStyle(
-                        color: Colors.white,
+                    style: TextStyle(
+                        color: nameClr,
                         fontSize: 15,
                         fontWeight: FontWeight.w700),
                   ),
@@ -173,24 +182,23 @@ class _AppDrawer extends StatelessWidget {
                   if ((auth.user?.email ?? '').isNotEmpty)
                     Text(
                       auth.user!.email,
-                      style: const TextStyle(
-                          color: AppTheme.textOnDarkMuted, fontSize: 12),
+                      style: TextStyle(color: emailClr, fontSize: 12),
                     ),
                 ]),
               ),
             ),
-            const Divider(color: Colors.white24),
+            Divider(color: dividerClr),
             // ── Nav items ────────────────────────────────────────────────────
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                children: _navItems.map((item) => _DrawerNavItem(
+                children: _navItems.map((item) => DrawerNavItem(
                   icon: item.$1, label: item.$2,
                   route: item.$3, current: currentRoute,
                 )).toList(),
               ),
             ),
-            const Divider(color: Colors.white24),
+            Divider(color: dividerClr),
             // ── Sign out ─────────────────────────────────────────────────────
             ListTile(
               leading: Icon(Icons.logout,
@@ -215,9 +223,9 @@ class _AppDrawer extends StatelessWidget {
 }
 
 // ── Drawer avatar (larger, 36 radius) ─────────────────────────────────────────
-class _DrawerAvatar extends StatelessWidget {
+class DrawerAvatar extends StatelessWidget {
   final String? avatarUrl;
-  const _DrawerAvatar({this.avatarUrl});
+  const DrawerAvatar({this.avatarUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -248,31 +256,35 @@ class _DrawerAvatar extends StatelessWidget {
   }
 }
 
-class _DrawerNavItem extends StatelessWidget {
+class DrawerNavItem extends StatelessWidget {
   final IconData icon;
   final String label, route, current;
-  const _DrawerNavItem({
+  const DrawerNavItem({
     required this.icon, required this.label,
     required this.route, required this.current});
 
   @override
   Widget build(BuildContext context) {
-    final isActive = current == route;
+    final isActive     = current == route;
+    final isDark       = AppTheme.isDark(context);
+    final activeHighlight = isDark
+        ? AppTheme.primary.withValues(alpha: 0.25)
+        : Colors.white.withValues(alpha: 0.2);
+    final activeClr    = isDark ? AppTheme.accentLight  : Colors.white;
+    final inactiveClr  = isDark ? AppTheme.fbDarkTextSub : AppTheme.textOnDarkMuted;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isActive
-            ? Colors.white.withOpacity(0.2)
-            : Colors.transparent,
+        color: isActive ? activeHighlight : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
       ),
       child: ListTile(
         dense: true,
         leading: Icon(icon,
-            color: isActive ? Colors.white : AppTheme.textOnDarkMuted,
-            size: 22),
+            color: isActive ? activeClr : inactiveClr, size: 22),
         title: Text(label, style: TextStyle(
-          color: isActive ? Colors.white : AppTheme.textOnDarkMuted,
+          color: isActive ? activeClr : inactiveClr,
           fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
           fontSize: 14,
         )),

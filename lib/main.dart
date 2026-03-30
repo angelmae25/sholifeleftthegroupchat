@@ -1,5 +1,8 @@
 // =============================================================================
-// main.dart — Application entry point
+// main.dart  (UPDATED)
+// - SQLite settings loaded before runApp() to prevent dark mode flicker
+// - SettingsController no longer needs loadSettings() called manually in
+//   the provider create — it's pre-loaded here
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -11,6 +14,7 @@ import 'theme/app_theme.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/controllers.dart';
 import 'controllers/org_post_controller.dart';
+import '../services/database_service.dart';
 
 // Views
 import 'views/splash_view.dart';
@@ -25,14 +29,14 @@ import 'views/edit_profile_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Uncomment these lines once Firebase is set up ─────────────────────────
+  // ── Pre-load SQLite settings BEFORE runApp so dark mode applies instantly ──
+  // This prevents the white flash when dark mode is enabled on app open.
+  final settingsRow = await DatabaseService.instance.loadSettings();
+  final savedDarkMode = (settingsRow['dark_mode'] as int? ?? 0) == 1;
+
+  // ── Uncomment once Firebase is set up ─────────────────────────────────────
   // await Firebase.initializeApp();
   // await NotificationService.instance.init();
-  // NotificationService.instance.onNotificationTap = (message) {
-  //   final type = NotificationService.getNotificationType(message);
-  //   if (type == 'event') _router.go('/events');
-  //   if (type == 'news')  _router.go('/news');
-  // };
 
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
@@ -40,7 +44,7 @@ void main() async {
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light));
 
-  runApp(const ScholifeApp());
+  runApp(ScholifeApp(initialDarkMode: savedDarkMode));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,9 +67,7 @@ final _router = GoRouter(
     GoRoute(path: '/leaderboard',    builder: (_, __) => const LeaderboardView()),
     GoRoute(path: '/profile',        builder: (_, __) => const ProfileView()),
     GoRoute(path: '/settings',       builder: (_, __) => const SettingsView()),
-    
 
-    // ── Create Post route (for org-assigned students) ──────────────────────
     GoRoute(
       path: '/create-post',
       builder: (context, state) => CreatePostView(
@@ -89,16 +91,15 @@ final _router = GoRouter(
 // ROOT APP
 // ─────────────────────────────────────────────────────────────────────────────
 class ScholifeApp extends StatelessWidget {
-  const ScholifeApp({super.key});
+  final bool initialDarkMode;
+  const ScholifeApp({super.key, required this.initialDarkMode});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // ── Auth ───────────────────────────────────────────────────────────
         ChangeNotifierProvider(create: (_) => AuthController()),
 
-        // ── Feature controllers ────────────────────────────────────────────
         ChangeNotifierProvider(create: (_) => NewsController()),
         ChangeNotifierProvider(create: (_) => EventsController()),
         ChangeNotifierProvider(create: (_) => MarketplaceController()),
@@ -108,28 +109,26 @@ class ScholifeApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LeaderboardController()),
         ChangeNotifierProvider(create: (_) => ProfileController()),
 
-        // ── Settings — loaded first so dark mode applies on startup ────────
+        // ── Settings: pre-seeded with the dark mode value loaded before runApp
+        // so there's zero flicker. loadSettings() is still called in
+        // SplashView to load ALL other settings (notifications etc.)
         ChangeNotifierProvider(
           create: (_) {
             final c = SettingsController();
-            c.loadSettings(); // load dark mode preference from SharedPreferences
+            c.seedDarkMode(initialDarkMode); // instant, no async needed
             return c;
           },
         ),
 
-        // ── Org posting (assigned students only) ───────────────────────────
         ChangeNotifierProvider(create: (_) => OrgPostController()),
       ],
 
-      // ── Consumer<SettingsController> drives light/dark theme ──────────────
       child: Consumer<SettingsController>(
         builder: (_, settings, __) => MaterialApp.router(
           title: 'Scholife',
-          theme:      AppTheme.theme,       // light theme
-          darkTheme:  AppTheme.darkTheme,   // dark theme
-          themeMode:  settings.darkMode
-              ? ThemeMode.dark
-              : ThemeMode.light,
+          theme:      AppTheme.theme,
+          darkTheme:  AppTheme.darkTheme,
+          themeMode:  settings.darkMode ? ThemeMode.dark : ThemeMode.light,
           routerConfig: _router,
           debugShowCheckedModeBanner: false,
         ),

@@ -35,7 +35,7 @@ class ChatSocketService {
 
   bool get isConnected => _isConnected;
 
-  // ── Connect ────────────────────────────────────────────────────────────────
+  // ── Connect ─────────────────────────── ─────────────────────────────────────
   /// Connects to Flask-SocketIO with JWT auth.
   /// Safe to call multiple times — skips if already connected.
   Future<void> connect() async {

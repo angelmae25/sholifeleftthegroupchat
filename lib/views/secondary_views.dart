@@ -39,38 +39,40 @@ class _MarketplaceViewState extends State<MarketplaceView> {
     return AppScaffold(
       title: 'Pre-loved Items', currentRoute: '/marketplace',
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellItemView())),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SellItemView())),
         backgroundColor: AppTheme.primary,
         icon: const Icon(Icons.add, color: Colors.white),
         // ← FIXED: Colors.white not AppTheme.cardColor(context) in const TextStyle
         label: const Text('Sell Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
       ),
-      body: Consumer<MarketplaceController>(builder: (_, ctrl, __) => Column(children: [
-        Container(
-          color: cardClr, padding: const EdgeInsets.all(12),
-          child: TextField(
-            onChanged: ctrl.search,
-            decoration: InputDecoration(
-              hintText: 'Search items...',
-              prefixIcon: const Icon(Icons.search, color: AppTheme.textSecondary),
-              filled: true, fillColor: pageClr,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      body: Consumer<MarketplaceController>(builder: (_, ctrl, __) => Container(
+          color: pageClr,
+          child: Column(children: [
+            Container(
+              color: cardClr, padding: const EdgeInsets.all(12),
+              child: TextField(
+                onChanged: ctrl.search,
+                decoration: InputDecoration(
+                  hintText: 'Search items...',
+                  prefixIcon: const Icon(Icons.search, color: AppTheme.textSecondary),
+                  filled: true, fillColor: pageClr,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
             ),
-          ),
-        ),
-        if (ctrl.isLoading) const Expanded(child: Center(child: CircularProgressIndicator(color: AppTheme.primary))),
-        if (!ctrl.isLoading) Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.70,
+            if (ctrl.isLoading) const Expanded(child: Center(child: CircularProgressIndicator(color: AppTheme.primary))),
+            if (!ctrl.isLoading) Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.70,
+                ),
+                itemCount: ctrl.items.length,
+                itemBuilder: (_, i) => _ItemCard(item: ctrl.items[i]),
+              ),
             ),
-            itemCount: ctrl.items.length,
-            itemBuilder: (_, i) => _ItemCard(item: ctrl.items[i]),
-          ),
-        ),
-      ])),
+          ]))),
     );
   }
 }
@@ -88,13 +90,36 @@ class _ItemCard extends StatelessWidget {
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-          child: _ItemImage(imageUrl: item.imageUrl, height: 110),
+        GestureDetector(
+          onTap: () => _openImagePopup(context, item.imageUrl),
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: _ItemImage(imageUrl: item.imageUrl, height: 110),
+              ),
+              if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                Positioned(
+                  bottom: 6, right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.zoom_out_map_rounded, color: Colors.white, size: 11),
+                      SizedBox(width: 3),
+                      Text('View', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500)),
+                    ]),
+                  ),
+                ),
+            ],
+          ),
         ),
         Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(item.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text(item.condition, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+          Text(item.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textMain(context)), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(item.condition, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
           const SizedBox(height: 6),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(item.formattedPrice, style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 15)),
@@ -110,6 +135,19 @@ class _ItemCard extends StatelessWidget {
           ]),
         ])),
       ]),
+    );
+  }
+
+  void _openImagePopup(BuildContext context, String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) return;
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        pageBuilder: (_, __, ___) => _FullScreenImagePopup(imageUrl: imageUrl),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
     );
   }
 
@@ -146,23 +184,25 @@ class _LostFoundViewState extends State<LostFoundView> {
     final pageClr = AppTheme.pageColor(context);
     return AppScaffold(
       title: 'Lost & Found', currentRoute: '/lost-found',
-      body: Consumer<LostFoundController>(builder: (_, ctrl, __) => Column(children: [
-        Container(
-          color: cardClr, padding: const EdgeInsets.all(12),
-          child: Container(
-            decoration: BoxDecoration(color: pageClr, borderRadius: BorderRadius.circular(10)),
-            child: Row(children: [
-              _ToggleBtn('Lost Items',  ctrl.activeTab == LostFoundStatus.lost,  () => ctrl.setTab(LostFoundStatus.lost)),
-              _ToggleBtn('Found Items', ctrl.activeTab == LostFoundStatus.found, () => ctrl.setTab(LostFoundStatus.found)),
-            ]),
-          ),
-        ),
-        if (ctrl.isLoading) const Expanded(child: Center(child: CircularProgressIndicator(color: AppTheme.primary))),
-        if (!ctrl.isLoading) Expanded(
-          child: ListView(padding: const EdgeInsets.all(14),
-              children: ctrl.filteredItems.map((item) => _LostFoundCard(item: item)).toList()),
-        ),
-      ])),
+      body: Consumer<LostFoundController>(builder: (_, ctrl, __) => Container(
+          color: pageClr,
+          child: Column(children: [
+            Container(
+              color: cardClr, padding: const EdgeInsets.all(12),
+              child: Container(
+                decoration: BoxDecoration(color: pageClr, borderRadius: BorderRadius.circular(10)),
+                child: Row(children: [
+                  _ToggleBtn('Lost Items',  ctrl.activeTab == LostFoundStatus.lost,  () => ctrl.setTab(LostFoundStatus.lost)),
+                  _ToggleBtn('Found Items', ctrl.activeTab == LostFoundStatus.found, () => ctrl.setTab(LostFoundStatus.found)),
+                ]),
+              ),
+            ),
+            if (ctrl.isLoading) const Expanded(child: Center(child: CircularProgressIndicator(color: AppTheme.primary))),
+            if (!ctrl.isLoading) Expanded(
+              child: ListView(padding: const EdgeInsets.all(14),
+                  children: ctrl.filteredItems.map((item) => _LostFoundCard(item: item)).toList()),
+            ),
+          ]))),
       floatingActionButton: Consumer<LostFoundController>(builder: (_, ctrl, __) {
         final isLost = ctrl.activeTab == LostFoundStatus.lost;
         return FloatingActionButton.extended(
@@ -193,8 +233,7 @@ class _ToggleBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(label, textAlign: TextAlign.center, style: TextStyle(
-          // ← FIXED: Colors.white not AppTheme.cardColor(context)
-          color: active ? Colors.white : AppTheme.textSecondary,
+          color: active ? Colors.white : AppTheme.textSub(context),
           fontWeight: FontWeight.w600, fontSize: 13,
         )),
       ),
@@ -206,11 +245,28 @@ class _LostFoundCard extends StatelessWidget {
   final LostFoundModel item;
   const _LostFoundCard({required this.item});
 
+  // ── Opens a full-screen image viewer ──────────────────────────────────────
+  void _openImage(BuildContext context, Color color) {
+    final hasImage = item.imageUrl != null && item.imageUrl!.isNotEmpty;
+    if (!hasImage) return;
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (_) => _LostFoundImageViewer(
+        imageUrl: item.imageUrl!,
+        title: item.title,
+        color: color,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isLost = item.status == LostFoundStatus.lost;
-    final color  = isLost ? const Color(0xFFB71C1C) : const Color(0xFF2E7D32);
+    final isLost  = item.status == LostFoundStatus.lost;
+    final color   = isLost ? const Color(0xFFB71C1C) : const Color(0xFF2E7D32);
     final cardClr = AppTheme.cardColor(context);
+    final hasImage = item.imageUrl != null && item.imageUrl!.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -219,8 +275,33 @@ class _LostFoundCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ClipRRect(borderRadius: BorderRadius.circular(12),
-              child: _LostFoundThumb(imageUrl: item.imageUrl, color: color)),
+
+          // ── Tappable thumbnail ─────────────────────────────────────────
+          GestureDetector(
+            onTap: hasImage ? () => _openImage(context, color) : null,
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: _LostFoundThumb(imageUrl: item.imageUrl, color: color),
+                ),
+                // show a small zoom icon if image exists
+                if (hasImage)
+                  Positioned(
+                    right: 2, bottom: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(Icons.zoom_in, size: 12, color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
@@ -275,6 +356,108 @@ class _LostFoundCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LOST & FOUND IMAGE VIEWER (full-screen popup)
+// ─────────────────────────────────────────────────────────────────────────────
+class _LostFoundImageViewer extends StatelessWidget {
+  final String imageUrl;
+  final String title;
+  final Color  color;
+
+  const _LostFoundImageViewer({
+    required this.imageUrl,
+    required this.title,
+    required this.color,
+  });
+
+  Widget _buildImage() {
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final bytes = base64Decode(imageUrl.split(',').last);
+        return Image.memory(bytes, fit: BoxFit.contain);
+      } catch (_) {
+        return const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 64);
+      }
+    }
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.contain,
+      loadingBuilder: (_, child, progress) => progress == null
+          ? child
+          : const Center(child: CircularProgressIndicator(color: Colors.white)),
+      errorBuilder: (_, __, ___) =>
+      const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 64),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Header bar ─────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 18),
+                ),
+              ),
+            ]),
+          ),
+
+          // ── Image area ─────────────────────────────────────────────────
+          Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.65,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: Center(child: _buildImage()),
+              ),
+            ),
+          ),
+
+          // ── Hint text ──────────────────────────────────────────────────
+          const SizedBox(height: 8),
+          const Text(
+            'Pinch to zoom  •  Tap outside to close',
+            style: TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CHAT VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 class ChatView extends StatefulWidget {
@@ -298,32 +481,35 @@ class _ChatViewState extends State<ChatView> {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'Chat', currentRoute: '/chat',
-      body: Consumer<ChatController>(builder: (_, ctrl, __) {
-        if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
-        if (ctrl.conversations.isEmpty) {
-          return Center(
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.chat_bubble_outline, size: 64, color: AppTheme.primary.withValues(alpha: 0.3)),
-              const SizedBox(height: 12),
-              Text('No conversations yet.', style: TextStyle(color: AppTheme.textSub(context), fontSize: 14)),
-              const SizedBox(height: 6),
-              Text('Tap "Chat Seller" on a marketplace item\nor "Contact" on a lost & found report.',
-                  textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSub(context), fontSize: 12)),
-            ]),
+      body: Container(
+        color: AppTheme.pageColor(context),
+        child: Consumer<ChatController>(builder: (_, ctrl, __) {
+          if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+          if (ctrl.conversations.isEmpty) {
+            return Center(
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.chat_bubble_outline, size: 64, color: AppTheme.primary.withValues(alpha: 0.3)),
+                const SizedBox(height: 12),
+                Text('No conversations yet.', style: TextStyle(color: AppTheme.textSub(context), fontSize: 14)),
+                const SizedBox(height: 6),
+                Text('Tap "Chat Seller" on a marketplace item\nor "Contact" on a lost & found report.',
+                    textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSub(context), fontSize: 12)),
+              ]),
+            );
+          }
+          return ListView.builder(
+            itemCount: ctrl.conversations.length,
+            itemBuilder: (_, i) {
+              final c = ctrl.conversations[i];
+              return _ConversationTile(chat: c, onTap: () {
+                ctrl.openConversation(c.id);
+                Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(value: ctrl, child: _ChatDetailView(chat: c))));
+              });
+            },
           );
-        }
-        return ListView.builder(
-          itemCount: ctrl.conversations.length,
-          itemBuilder: (_, i) {
-            final c = ctrl.conversations[i];
-            return _ConversationTile(chat: c, onTap: () {
-              ctrl.openConversation(c.id);
-              Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => ChangeNotifierProvider.value(value: ctrl, child: _ChatDetailView(chat: c))));
-            });
-          },
-        );
-      }),
+        }),
+      ),
     );
   }
 }
@@ -503,68 +689,71 @@ class _ClubsViewState extends State<ClubsView> {
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: 'Clubs & Organizations', currentRoute: '/clubs',
-    body: Consumer<ClubsController>(builder: (_, ctrl, __) {
-      if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
-      return GridView.builder(
-        padding: const EdgeInsets.all(14),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.85,
-        ),
-        itemCount: ctrl.clubs.length,
-        itemBuilder: (_, i) {
-          final club  = ctrl.clubs[i];
-          final isOrg = club.id.startsWith('org_');
-          return Container(
-            decoration: BoxDecoration(
-              color: AppTheme.cardColor(context), borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
-            ),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Container(
-                width: 64, height: 64,
-                decoration: BoxDecoration(color: club.color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(club.icon, color: club.color, size: 32),
+    body: Container(
+      color: AppTheme.pageColor(context),
+      child: Consumer<ClubsController>(builder: (_, ctrl, __) {
+        if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+        return GridView.builder(
+          padding: const EdgeInsets.all(14),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.85,
+          ),
+          itemCount: ctrl.clubs.length,
+          itemBuilder: (_, i) {
+            final club  = ctrl.clubs[i];
+            final isOrg = club.id.startsWith('org_');
+            return Container(
+              decoration: BoxDecoration(
+                color: AppTheme.cardColor(context), borderRadius: BorderRadius.circular(14),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
               ),
-              const SizedBox(height: 10),
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(club.name, textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textMain(context)))),
-              Text(club.department, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
-              const SizedBox(height: 12),
-              if (isOrg)
-              // ── Tappable "Organization" button ────────────────────────
-                GestureDetector(
-                  onTap: () => _showOrgDetail(context, club),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: club.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: club.color.withValues(alpha: 0.3)),
-                    ),
-                    child: Text('Organization', style: TextStyle(color: club.color, fontSize: 11, fontWeight: FontWeight.w600)),
-                  ),
-                )
-              else
-                GestureDetector(
-                  onTap: () => ctrl.toggleMembership(club.id),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: club.isJoined ? club.color : Colors.transparent,
-                      border: Border.all(color: club.color),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(club.isJoined ? 'Joined ✓' : 'Join', style: TextStyle(
-                      color: club.isJoined ? Colors.white : club.color, fontSize: 12, fontWeight: FontWeight.w700,
-                    )),
-                  ),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(
+                  width: 64, height: 64,
+                  decoration: BoxDecoration(color: club.color.withValues(alpha: 0.12), shape: BoxShape.circle),
+                  child: Icon(club.icon, color: club.color, size: 32),
                 ),
-            ]),
-          );
-        },
-      );
-    }),
+                const SizedBox(height: 10),
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(club.name, textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textMain(context)))),
+                Text(club.department, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
+                const SizedBox(height: 12),
+                if (isOrg)
+                // ── Tappable "Organization" button ────────────────────────
+                  GestureDetector(
+                    onTap: () => _showOrgDetail(context, club),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: club.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: club.color.withValues(alpha: 0.3)),
+                      ),
+                      child: Text('Organization', style: TextStyle(color: club.color, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => ctrl.toggleMembership(club.id),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: club.isJoined ? club.color : Colors.transparent,
+                        border: Border.all(color: club.color),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(club.isJoined ? 'Joined ✓' : 'Join', style: TextStyle(
+                        color: club.isJoined ? Colors.white : club.color, fontSize: 12, fontWeight: FontWeight.w700,
+                      )),
+                    ),
+                  ),
+              ]),
+            );
+          },
+        );
+      }),
+    ),
   );
 }
 
@@ -584,7 +773,7 @@ class _OrgDetailSheet extends StatefulWidget {
 class _OrgDetailSheetState extends State<_OrgDetailSheet> {
   // ── Spring Boot base (same IP as OrgPostService) ──────────────────────────
   // Update this IP to match your PC's WiFi IP.
-  static const String _springBase = 'http://192.168.1.11:8080/api/org-post';
+  static const String _springBase = 'http://192.168.1.11:5000/api/mobile';
 
   bool                _loading = true;
   String?             _error;
@@ -846,61 +1035,64 @@ class _LeaderboardViewState extends State<LeaderboardView> {
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: 'Leaderboard', currentRoute: '/leaderboard',
-    body: Consumer<LeaderboardController>(builder: (_, ctrl, __) {
-      if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
-      return Column(children: [
-        Container(
-          color: AppTheme.primaryDark, padding: const EdgeInsets.all(20),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-            if (ctrl.topThree.length > 1) _PodiumCol(entry: ctrl.topThree[1], height: 80),
-            const SizedBox(width: 12),
-            if (ctrl.topThree.isNotEmpty) _PodiumCol(entry: ctrl.topThree[0], height: 100),
-            const SizedBox(width: 12),
-            if (ctrl.topThree.length > 2) _PodiumCol(entry: ctrl.topThree[2], height: 64),
-          ]),
-        ),
-        Container(
-          width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          color: AppTheme.accent.withValues(alpha: 0.1),
-          child: const Row(children: [
-            Icon(Icons.stars_outlined, size: 16, color: AppTheme.accent),
-            SizedBox(width: 8),
-            Expanded(child: Text('Attend events to earn points and climb the leaderboard!  +10 pts per event',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.w500))),
-          ]),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            itemCount: ctrl.theRest.length,
-            itemBuilder: (_, i) {
-              final e = ctrl.theRest[i];
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: AppTheme.cardColor(context), borderRadius: BorderRadius.circular(12)),
-                child: Row(children: [
-                  Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(color: AppTheme.pageColor(context), shape: BoxShape.circle),
-                    child: Center(child: Text('${e.rank}',
-                        style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.textSub(context)))),
-                  ),
-                  const SizedBox(width: 12),
-                  _LeaderboardAvatar(avatarUrl: e.avatarUrl, radius: 20),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(e.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textMain(context))),
-                    Text(e.department, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
-                  ])),
-                  Text('${e.points} pts', style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 14)),
-                ]),
-              );
-            },
+    body: Container(
+      color: AppTheme.pageColor(context),
+      child: Consumer<LeaderboardController>(builder: (_, ctrl, __) {
+        if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+        return Column(children: [
+          Container(
+            color: AppTheme.primaryDark, padding: const EdgeInsets.all(20),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+              if (ctrl.topThree.length > 1) _PodiumCol(entry: ctrl.topThree[1], height: 80),
+              const SizedBox(width: 12),
+              if (ctrl.topThree.isNotEmpty) _PodiumCol(entry: ctrl.topThree[0], height: 100),
+              const SizedBox(width: 12),
+              if (ctrl.topThree.length > 2) _PodiumCol(entry: ctrl.topThree[2], height: 64),
+            ]),
           ),
-        ),
-      ]);
-    }),
+          Container(
+            width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: AppTheme.accent.withValues(alpha: 0.1),
+            child: Row(children: [
+              const Icon(Icons.stars_outlined, size: 16, color: AppTheme.accent),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Attend events to earn points and climb the leaderboard!  +10 pts per event',
+                  style: TextStyle(color: AppTheme.textSub(context), fontSize: 11, fontWeight: FontWeight.w500))),
+            ]),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              itemCount: ctrl.theRest.length,
+              itemBuilder: (_, i) {
+                final e = ctrl.theRest[i];
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: AppTheme.cardColor(context), borderRadius: BorderRadius.circular(12)),
+                  child: Row(children: [
+                    Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(color: AppTheme.pageColor(context), shape: BoxShape.circle),
+                      child: Center(child: Text('${e.rank}',
+                          style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.textSub(context)))),
+                    ),
+                    const SizedBox(width: 12),
+                    _LeaderboardAvatar(avatarUrl: e.avatarUrl, radius: 20),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(e.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textMain(context))),
+                      Text(e.department, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
+                    ])),
+                    Text('${e.points} pts', style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 14)),
+                  ]),
+                );
+              },
+            ),
+          ),
+        ]);
+      }),
+    ),
   );
 }
 
@@ -956,92 +1148,95 @@ class _ProfileViewState extends State<ProfileView> {
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: 'Profile', currentRoute: '/profile',
-    body: Consumer<ProfileController>(builder: (_, ctrl, __) {
-      if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
-      final user = ctrl.profile;
-      if (user == null) return const Center(child: Text('Could not load profile.'));
-      final cardClr = AppTheme.cardColor(context);
-      return SingleChildScrollView(child: Column(children: [
-        Container(
-          width: double.infinity, padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [AppTheme.primaryDark, AppTheme.primary],
-                begin: Alignment.topLeft, end: Alignment.bottomRight),
-          ),
-          child: Column(children: [
-            GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditProfileView(user: user)))
-                  .then((_) {
-                if (!context.mounted) return;
-                final auth = context.read<AuthController>();
-                context.read<ProfileController>().loadProfile(auth.user?.id ?? '');
-              }),
-              child: Stack(children: [
-                _ProfileAvatar(avatarUrl: user.avatarUrl, radius: 48),
-                Positioned(bottom: 0, right: 0,
-                  child: Container(
-                    width: 28, height: 28,
-                    decoration: const BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle),
-                    child: const Icon(Icons.edit, size: 16, color: Colors.white),
+    body: Container(
+      color: AppTheme.pageColor(context),
+      child: Consumer<ProfileController>(builder: (_, ctrl, __) {
+        if (ctrl.isLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+        final user = ctrl.profile;
+        if (user == null) return const Center(child: Text('Could not load profile.'));
+        final cardClr = AppTheme.cardColor(context);
+        return SingleChildScrollView(child: Column(children: [
+          Container(
+            width: double.infinity, padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [AppTheme.primaryDark, AppTheme.primary],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight),
+            ),
+            child: Column(children: [
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditProfileView(user: user)))
+                    .then((_) {
+                  if (!context.mounted) return;
+                  final auth = context.read<AuthController>();
+                  context.read<ProfileController>().loadProfile(auth.user?.id ?? '');
+                }),
+                child: Stack(children: [
+                  _ProfileAvatar(avatarUrl: user.avatarUrl, radius: 48),
+                  Positioned(bottom: 0, right: 0,
+                    child: Container(
+                      width: 28, height: 28,
+                      decoration: const BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle),
+                      child: const Icon(Icons.edit, size: 16, color: Colors.white),
+                    ),
                   ),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            // ← FIXED: Colors.white not AppTheme.cardColor(context) in on-gradient text
-            Text(user.fullName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text(user.email, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-              child: Text('${user.course} · ${user.yearLevel}',
-                  style: const TextStyle(color: Colors.white, fontSize: 12)),
-            ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              // ← FIXED: Colors.white not AppTheme.cardColor(context) in on-gradient text
+              Text(user.fullName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text(user.email, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
+                child: Text('${user.course} · ${user.yearLevel}',
+                    style: const TextStyle(color: Colors.white, fontSize: 12)),
+              ),
+            ]),
+          ),
+          Container(color: cardClr, padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(children: [
+                _StatCol('${user.points}', 'Points'),
+                _StatCol('#${user.rank}', 'Rank'),
+                _StatCol('${user.clubCount}', 'Clubs'),
+                _StatCol('${user.postCount}', 'Posts'),
+              ])),
+          const SizedBox(height: 8),
+          _InfoSection('Personal Information', [
+            _InfoRow(Icons.person_outline,        'Full Name',   user.fullName),
+            _InfoRow(Icons.badge_outlined,         'Student ID',  user.studentId),
+            _InfoRow(Icons.school_outlined,        'Course',      user.course),
+            _InfoRow(Icons.calendar_today_outlined,'Year Level',  user.yearLevel),
           ]),
-        ),
-        Container(color: cardClr, padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(children: [
-              _StatCol('${user.points}', 'Points'),
-              _StatCol('#${user.rank}', 'Rank'),
-              _StatCol('${user.clubCount}', 'Clubs'),
-              _StatCol('${user.postCount}', 'Posts'),
-            ])),
-        const SizedBox(height: 8),
-        _InfoSection('Personal Information', [
-          _InfoRow(Icons.person_outline,        'Full Name',   user.fullName),
-          _InfoRow(Icons.badge_outlined,         'Student ID',  user.studentId),
-          _InfoRow(Icons.school_outlined,        'Course',      user.course),
-          _InfoRow(Icons.calendar_today_outlined,'Year Level',  user.yearLevel),
-        ]),
-        const SizedBox(height: 8),
-        _InfoSection('Contact', [
-          _InfoRow(Icons.email_outlined, 'Email', user.email),
-          if (user.phone != null) _InfoRow(Icons.phone_outlined, 'Phone', user.phone!),
-        ]),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: SizedBox(width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                await context.read<AuthController>().signOut();
-                if (context.mounted) context.go('/sign-in');
-              },
-              icon: const Icon(Icons.logout, color: Colors.red),
-              label: const Text('Sign Out', style: TextStyle(color: Colors.red)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          const SizedBox(height: 8),
+          _InfoSection('Contact', [
+            _InfoRow(Icons.email_outlined, 'Email', user.email),
+            if (user.phone != null) _InfoRow(Icons.phone_outlined, 'Phone', user.phone!),
+          ]),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SizedBox(width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await context.read<AuthController>().signOut();
+                  if (context.mounted) context.go('/sign-in');
+                },
+                icon: const Icon(Icons.logout, color: Colors.red),
+                label: const Text('Sign Out', style: TextStyle(color: Colors.red)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 20),
-      ]));
-    }),
+          const SizedBox(height: 20),
+        ]));
+      }),
+    ),
   );
 }
 
@@ -1051,7 +1246,7 @@ class _StatCol extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(child: Column(children: [
     Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: AppTheme.primary)),
-    Text(label, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11)),
+    Text(label, style: TextStyle(color: AppTheme.textSub(context), fontSize: 11, fontWeight: FontWeight.w500)),
   ]));
 }
 
@@ -1095,48 +1290,51 @@ class SettingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: 'Settings', currentRoute: '/settings',
-    body: Consumer<SettingsController>(builder: (_, ctrl, __) => ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        _SettingsGroup('Notifications', [
-          _ToggleRow('Push Notifications', 'Receive app notifications', Icons.notifications_outlined, ctrl.pushNotifications, ctrl.setPushNotifications),
-          _ToggleRow('Email Alerts', 'Get updates via email', Icons.email_outlined, ctrl.emailAlerts, ctrl.setEmailAlerts),
-        ]),
-        const SizedBox(height: 12),
-        _SettingsGroup('Appearance', [
-          _ToggleRow('Dark Mode', 'Switch to dark theme', Icons.dark_mode_outlined, ctrl.darkMode, ctrl.setDarkMode),
-        ]),
-        const SizedBox(height: 12),
-        _SettingsGroup('Privacy', [
-          _ToggleRow('Location Access', 'Allow location for events', Icons.location_on_outlined, ctrl.locationAccess, ctrl.setLocationAccess),
-        ]),
-        const SizedBox(height: 12),
-        _SettingsGroup('Account', [
-          _TapRow('Change Password', Icons.lock_outline, () => _showChangePasswordDialog(context)),
-          _TapRow('Terms & Conditions', Icons.description_outlined, () =>
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditionsView()))),
-          _TapRow('Privacy Policy', Icons.policy_outlined, () =>
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyView()))),
-          _TapRow('Report a Problem', Icons.flag_outlined, () => _showReportDialog(context)),
-        ]),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(color: AppTheme.cardColor(context), borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Sign Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-            onTap: () async {
-              await context.read<AuthController>().signOut();
-              if (context.mounted) context.go('/sign-in');
-            },
+    body: Container(
+      color: AppTheme.pageColor(context),
+      child: Consumer<SettingsController>(builder: (_, ctrl, __) => ListView(
+        padding: const EdgeInsets.all(14),
+        children: [
+          _SettingsGroup('Notifications', [
+            _ToggleRow('Push Notifications', 'Receive app notifications', Icons.notifications_outlined, ctrl.pushNotifications, ctrl.setPushNotifications),
+            _ToggleRow('Email Alerts', 'Get updates via email', Icons.email_outlined, ctrl.emailAlerts, ctrl.setEmailAlerts),
+          ]),
+          const SizedBox(height: 12),
+          _SettingsGroup('Appearance', [
+            _ToggleRow('Dark Mode', 'Switch to dark theme', Icons.dark_mode_outlined, ctrl.darkMode, ctrl.setDarkMode),
+          ]),
+          const SizedBox(height: 12),
+          _SettingsGroup('Privacy', [
+            _ToggleRow('Location Access', 'Allow location for events', Icons.location_on_outlined, ctrl.locationAccess, ctrl.setLocationAccess),
+          ]),
+          const SizedBox(height: 12),
+          _SettingsGroup('Account', [
+            _TapRow('Change Password', Icons.lock_outline, () => _showChangePasswordDialog(context)),
+            _TapRow('Terms & Conditions', Icons.description_outlined, () =>
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditionsView()))),
+            _TapRow('Privacy Policy', Icons.policy_outlined, () =>
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyView()))),
+            _TapRow('Report a Problem', Icons.flag_outlined, () => _showReportDialog(context)),
+          ]),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(color: AppTheme.cardColor(context), borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Sign Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+              onTap: () async {
+                await context.read<AuthController>().signOut();
+                if (context.mounted) context.go('/sign-in');
+              },
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        Text('Scholife v1.0.0', textAlign: TextAlign.center,
-            style: TextStyle(color: AppTheme.textSub(context), fontSize: 12)),
-        const SizedBox(height: 20),
-      ],
-    )),
+          const SizedBox(height: 20),
+          Text('Scholife v1.0.0', textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSub(context), fontSize: 12)),
+          const SizedBox(height: 20),
+        ],
+      )),
+    ),
   );
 }
 
@@ -1349,6 +1547,75 @@ class _TapRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // IMAGE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// FULL-SCREEN IMAGE POPUP
+// ─────────────────────────────────────────────────────────────────────────────
+class _FullScreenImagePopup extends StatelessWidget {
+  final String imageUrl;
+  const _FullScreenImagePopup({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget imageWidget;
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final bytes = base64Decode(imageUrl.split(',').last);
+        imageWidget = Image.memory(bytes, fit: BoxFit.contain);
+      } catch (_) {
+        imageWidget = const Icon(Icons.broken_image_outlined, color: Colors.white, size: 64);
+      }
+    } else {
+      imageWidget = Image.network(
+        imageUrl, fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) =>
+        const Icon(Icons.broken_image_outlined, color: Colors.white, size: 64),
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : const Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(children: [
+          // Dim background
+          const SizedBox.expand(child: ColoredBox(color: Colors.black87)),
+          // Pinch-to-zoom image
+          Center(
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 5.0,
+              child: imageWidget,
+            ),
+          ),
+          // Close button
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 class _ItemImage extends StatelessWidget {
   final String? imageUrl; final double height;
   const _ItemImage({this.imageUrl, required this.height});
