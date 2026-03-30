@@ -50,10 +50,11 @@ class _ReportLostFoundViewState extends State<ReportLostFoundView> {
       source: source, maxWidth: 800, maxHeight: 800, imageQuality: 75,
     );
     if (picked == null) return;
-    final bytes = await picked.readAsBytes();
+    final bytes    = await picked.readAsBytes();
+    final mimeType = picked.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
     setState(() {
       _imageFile   = File(picked.path);
-      _base64Image = base64Encode(bytes);
+      _base64Image = 'data:$mimeType;base64,${base64Encode(bytes)}';
     });
   }
 

@@ -816,6 +816,8 @@ class LostFoundService {
     required String status, String? base64Image,
   }) async {
     // ── Upload image first if provided ─────────────────────────────────────
+    // base64Image already has the full data URI prefix from the view
+    // (e.g. 'data:image/jpeg;base64,...') -- pass it directly, no re-wrapping.
     String? imageUrl;
     if (base64Image != null) {
       try {
@@ -823,14 +825,20 @@ class LostFoundService {
           Uri.parse('$_base/upload/image'),
           headers: await _authHeaders,
           body: jsonEncode({
-            'image': 'data:image/jpeg;base64,$base64Image',
+            'image': base64Image,   // already has the data URI prefix
             'type': 'lost_found',
           }),
         ).timeout(const Duration(seconds: 30));
         if (uploadRes.statusCode == 200) {
           imageUrl = (_safeJson(uploadRes) as Map<String, dynamic>)['url'] as String?;
+        } else {
+          debugPrint('[LostFoundService] image upload failed (${uploadRes.statusCode}), using base64 fallback');
+          imageUrl = base64Image;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[LostFoundService] image upload error: $e -- using base64 fallback');
+        imageUrl = base64Image;
+      }
     }
 
     final res = await http.post(Uri.parse('$_base/lost-found/'),

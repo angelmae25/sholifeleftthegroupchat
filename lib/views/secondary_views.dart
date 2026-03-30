@@ -90,32 +90,9 @@ class _ItemCard extends StatelessWidget {
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        GestureDetector(
-          onTap: () => _openImagePopup(context, item.imageUrl),
-          child: Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: _ItemImage(imageUrl: item.imageUrl, height: 110),
-              ),
-              if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
-                Positioned(
-                  bottom: 6, right: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.zoom_out_map_rounded, color: Colors.white, size: 11),
-                      SizedBox(width: 3),
-                      Text('View', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500)),
-                    ]),
-                  ),
-                ),
-            ],
-          ),
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+          child: _ItemImage(imageUrl: item.imageUrl, height: 110),
         ),
         Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(item.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textMain(context)), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -135,19 +112,6 @@ class _ItemCard extends StatelessWidget {
           ]),
         ])),
       ]),
-    );
-  }
-
-  void _openImagePopup(BuildContext context, String? imageUrl) {
-    if (imageUrl == null || imageUrl.isEmpty) return;
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black87,
-        pageBuilder: (_, __, ___) => _FullScreenImagePopup(imageUrl: imageUrl),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
     );
   }
 
@@ -1547,75 +1511,6 @@ class _TapRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // IMAGE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-// FULL-SCREEN IMAGE POPUP
-// ─────────────────────────────────────────────────────────────────────────────
-class _FullScreenImagePopup extends StatelessWidget {
-  final String imageUrl;
-  const _FullScreenImagePopup({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget imageWidget;
-    if (imageUrl.startsWith('data:image')) {
-      try {
-        final bytes = base64Decode(imageUrl.split(',').last);
-        imageWidget = Image.memory(bytes, fit: BoxFit.contain);
-      } catch (_) {
-        imageWidget = const Icon(Icons.broken_image_outlined, color: Colors.white, size: 64);
-      }
-    } else {
-      imageWidget = Image.network(
-        imageUrl, fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) =>
-        const Icon(Icons.broken_image_outlined, color: Colors.white, size: 64),
-        loadingBuilder: (_, child, progress) => progress == null
-            ? child
-            : const Center(child: CircularProgressIndicator(color: Colors.white)),
-      );
-    }
-
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Stack(children: [
-          // Dim background
-          const SizedBox.expand(child: ColoredBox(color: Colors.black87)),
-          // Pinch-to-zoom image
-          Center(
-            child: InteractiveViewer(
-              minScale: 0.5,
-              maxScale: 5.0,
-              child: imageWidget,
-            ),
-          ),
-          // Close button
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.close, color: Colors.white, size: 20),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
 class _ItemImage extends StatelessWidget {
   final String? imageUrl; final double height;
   const _ItemImage({this.imageUrl, required this.height});
