@@ -759,7 +759,8 @@ class MarketplaceService {
     List<String>? paymentMethods,
     String? base64Image,
   }) async {
-    // ── Upload image first if provided (same pattern as LostFoundService) ──
+    // ── FIX: base64Image already includes the full data URI prefix.
+    // Do NOT prepend 'data:image/jpeg;base64,' again.
     String? imageUrl;
     if (base64Image != null) {
       try {
@@ -767,17 +768,23 @@ class MarketplaceService {
           Uri.parse('$_base/upload/image'),
           headers: await _authHeaders,
           body: jsonEncode({
-            'image': 'data:image/jpeg;base64,$base64Image',
+            'image': base64Image, // ← FIXED: pass as-is, no double prefix
             'type': 'marketplace',
           }),
         ).timeout(const Duration(seconds: 30));
         if (uploadRes.statusCode == 200) {
           imageUrl = (_safeJson(uploadRes) as Map<String, dynamic>)['url'] as String?;
+        } else {
+          debugPrint('[Marketplace] Image upload failed: ${uploadRes.statusCode} ${uploadRes.body}');
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[Marketplace] Image upload exception: $e');
+        // Fallback: send base64 directly as image_url
+        imageUrl = base64Image;
+      }
 
-      // Fallback: if upload endpoint fails, send base64 directly as image_url
-      imageUrl ??= 'data:image/jpeg;base64,$base64Image';
+      // If upload returned no URL, fall back to base64 directly
+      imageUrl ??= base64Image;
     }
 
     final res = await http.post(Uri.parse('$_base/marketplace/'),
@@ -801,6 +808,11 @@ class MarketplaceService {
 
 // =============================================================================
 // LOST & FOUND SERVICE
+// FIX: base64Image already contains the full data URI
+// (e.g. "data:image/jpeg;base64,/9j/4AAQ...") — it must NOT be prefixed again.
+// The old code was doing 'data:image/jpeg;base64,$base64Image' which doubled
+// the prefix, causing the upload endpoint to reject it silently, leaving
+// imageUrl as null and no photo being saved or shown.
 // =============================================================================
 class LostFoundService {
   LostFoundService._();
@@ -834,6 +846,9 @@ class LostFoundService {
     required String status, String? base64Image,
   }) async {
     // ── Upload image first if provided ─────────────────────────────────────
+    // base64Image already contains the full data URI prefix, e.g.:
+    //   "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAA..."
+    // So pass it directly — do NOT prepend 'data:image/jpeg;base64,' again.
     String? imageUrl;
     if (base64Image != null) {
       try {
@@ -841,22 +856,37 @@ class LostFoundService {
           Uri.parse('$_base/upload/image'),
           headers: await _authHeaders,
           body: jsonEncode({
-            'image': 'data:image/jpeg;base64,$base64Image',
+            'image': base64Image, // ← FIXED: was 'data:image/jpeg;base64,$base64Image'
             'type': 'lost_found',
           }),
         ).timeout(const Duration(seconds: 30));
+
         if (uploadRes.statusCode == 200) {
           imageUrl = (_safeJson(uploadRes) as Map<String, dynamic>)['url'] as String?;
+          debugPrint('[LostFound] Image uploaded successfully: $imageUrl');
+        } else {
+          debugPrint('[LostFound] Image upload failed: ${uploadRes.statusCode} ${uploadRes.body}');
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[LostFound] Image upload exception: $e');
+      }
+
+      // Fallback: if upload endpoint is unavailable or fails,
+      // send the base64 string directly as image_url so the image
+      // is at least stored and shown in the app.
+      imageUrl ??= base64Image;
     }
 
-    final res = await http.post(Uri.parse('$_base/lost-found/'),
+    final res = await http.post(
+      Uri.parse('$_base/lost-found/'),
       headers: await _authHeaders,
       body: jsonEncode({
-        'title': title, 'description': description,
-        'location': location, 'date': date, 'status': status,
-        if (imageUrl != null) 'image_url': imageUrl,  // ← correct field name
+        'title':       title,
+        'description': description,
+        'location':    location,
+        'date':        date,
+        'status':      status,
+        if (imageUrl != null) 'image_url': imageUrl,
       }),
     ).timeout(const Duration(seconds: 30));
 

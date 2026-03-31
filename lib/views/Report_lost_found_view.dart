@@ -1,451 +1,240 @@
-// FILE PATH: lib/views/report_lost_found_view.dart
+// FILE PATH: lib/widgets/lost_found_item_card.dart
+//
+// FIX: Image now renders from imageUrl when available.
+//      Falls back to the question-mark placeholder only when imageUrl is null/empty.
 
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import '../controllers/controllers.dart';
+import '../models/models.dart';
 import '../theme/app_theme.dart';
 
-class ReportLostFoundView extends StatefulWidget {
-  final String initialStatus;
-  const ReportLostFoundView({super.key, this.initialStatus = 'lost'});
+class LostFoundItemCard extends StatelessWidget {
+  final LostFoundModel item;
+  final VoidCallback? onContactOwner;
 
-  @override
-  State<ReportLostFoundView> createState() => _ReportLostFoundViewState();
-}
-
-class _ReportLostFoundViewState extends State<ReportLostFoundView> {
-  final _formKey   = GlobalKey<FormState>();
-  final _titleCtrl = TextEditingController();
-  final _descCtrl  = TextEditingController();
-  final _locCtrl   = TextEditingController();
-
-  late String _status;
-  DateTime?   _selectedDate;
-  File?       _imageFile;
-  String?     _base64Image;
-  bool        _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _status = widget.initialStatus;
-  }
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _descCtrl.dispose();
-    _locCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    Navigator.pop(context);
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: source, maxWidth: 800, maxHeight: 800, imageQuality: 75,
-    );
-    if (picked == null) return;
-    final bytes    = await picked.readAsBytes();
-    final mimeType = picked.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-    setState(() {
-      _imageFile   = File(picked.path);
-      _base64Image = 'data:$mimeType;base64,${base64Encode(bytes)}';
-    });
-  }
-
-  void _showImageSourceSheet() {
-    final isDark = AppTheme.isDark(context);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.cardColor(context),
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 8),
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(
-                  color: isDark ? AppTheme.fbDarkInput : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined, color: AppTheme.primary),
-            title: Text('Choose from Gallery',
-                style: TextStyle(color: AppTheme.textMain(context))),
-            onTap: () => _pickImage(ImageSource.gallery),
-          ),
-          ListTile(
-            leading: const Icon(Icons.camera_alt_outlined, color: AppTheme.primary),
-            title: Text('Take a Photo',
-                style: TextStyle(color: AppTheme.textMain(context))),
-            onTap: () => _pickImage(ImageSource.camera),
-          ),
-          if (_imageFile != null)
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() { _imageFile = null; _base64Image = null; });
-              },
-            ),
-          const SizedBox(height: 8),
-        ]),
-      ),
-    );
-  }
-
-  Future<void> _pickDate() async {
-    final isDark = AppTheme.isDark(context);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: isDark
-              ? const ColorScheme.dark(primary: AppTheme.primary)
-              : const ColorScheme.light(primary: AppTheme.primary),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => _selectedDate = picked);
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedDate == null) {
-      _showError('Please select the date.');
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      final ctrl = context.read<LostFoundController>();
-      final ok   = await ctrl.reportItem(
-        title:       _titleCtrl.text.trim(),
-        description: _descCtrl.text.trim(),
-        location:    _locCtrl.text.trim(),
-        date:        DateFormat('yyyy-MM-dd').format(_selectedDate!),
-        status:      _status,
-        base64Image: _base64Image,
-      );
-
-      if (!mounted) return;
-
-      if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.check_circle_outline, color: Colors.white),
-            const SizedBox(width: 10),
-            Text('Item reported as ${_status.toUpperCase()} successfully!',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-          ]),
-          backgroundColor: Colors.green.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ));
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (mounted) Navigator.pop(context);
-      } else {
-        _showError(ctrl.error ?? 'Failed to submit report.');
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.error_outline, color: Colors.white),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg,
-            style: const TextStyle(fontWeight: FontWeight.w600))),
-      ]),
-      backgroundColor: Colors.red.shade700,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-  }
+  const LostFoundItemCard({
+    super.key,
+    required this.item,
+    this.onContactOwner,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = AppTheme.isDark(context);
-    final pageBg    = AppTheme.pageColor(context);
-    final inputFill = AppTheme.inputFill(context);
-    final borderClr = AppTheme.borderCol(context);
-    final textMain  = AppTheme.textMain(context);
-    final textSub   = AppTheme.textSub(context);
-    final isLost    = _status == 'lost';
-    final statusColor = isLost
-        ? const Color(0xFFB71C1C)
-        : const Color(0xFF2E7D32);
+    final isLost      = item.status == LostFoundStatus.lost;
+    final statusColor = isLost ? const Color(0xFFB71C1C) : const Color(0xFF2E7D32);
+    final statusLabel = isLost ? 'LOST' : 'FOUND';
+    final cardClr     = AppTheme.cardColor(context);
+    final textMain    = AppTheme.textMain(context);
+    final textSub     = AppTheme.textSub(context);
+    final borderClr   = AppTheme.borderCol(context);
 
-    return Scaffold(
-      backgroundColor: pageBg,
-      appBar: AppBar(
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        title: Text(
-          isLost ? 'Report Lost Item' : 'Report Found Item',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ),
+    final hasImage = item.imageUrl != null && item.imageUrl!.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: cardClr,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderClr),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-            // ── Status toggle ────────────────────────────────────────────────
-            _SLabel('Report Type *', textMain),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                  color: inputFill,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: borderClr)),
-              child: Row(children: [
-                _StatusBtn('Lost',  'lost',  _status,
-                    const Color(0xFFB71C1C),
-                        (v) => setState(() => _status = v)),
-                _StatusBtn('Found', 'found', _status,
-                    const Color(0xFF2E7D32),
-                        (v) => setState(() => _status = v)),
-              ]),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Thumbnail ────────────────────────────────────────────────────
+            _ItemThumbnail(
+              imageUrl:    item.imageUrl,
+              hasImage:    hasImage,
+              statusColor: statusColor,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(width: 14),
 
-            // ── Photo ────────────────────────────────────────────────────────
-            _SLabel('Photo (Optional)', textMain),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _showImageSourceSheet,
-              child: Container(
-                height: 180,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: inputFill,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: _imageFile != null ? statusColor : borderClr,
-                      width: _imageFile != null ? 2 : 1),
-                ),
-                child: _imageFile != null
-                    ? ClipRRect(
-                  borderRadius: BorderRadius.circular(11),
-                  child: Image.file(_imageFile!, fit: BoxFit.cover),
-                )
-                    : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 56, height: 56,
-                      decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.08),
-                          shape: BoxShape.circle),
-                      child: Icon(Icons.add_a_photo_outlined,
-                          size: 28, color: statusColor),
-                    ),
-                    const SizedBox(height: 10),
-                    Text('Tap to add a photo',
-                        style: TextStyle(
+            // ── Content ──────────────────────────────────────────────────────
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title row + status badge
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: textMain,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
                             color: statusColor,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text('Optional — helps identify the item',
-                        style: TextStyle(color: textSub, fontSize: 11)),
-                  ],
-                ),
-              ),
-            ),
-            if (_imageFile != null) ...[
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: _showImageSourceSheet,
-                  icon: Icon(Icons.edit, size: 13, color: statusColor),
-                  label: Text('Change photo',
-                      style: TextStyle(color: statusColor, fontSize: 12)),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-
-            // ── Title ────────────────────────────────────────────────────────
-            _SLabel('Item Name *', textMain),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _titleCtrl,
-              textCapitalization: TextCapitalization.words,
-              style: TextStyle(color: textMain),
-              decoration: _inputDeco(
-                  'e.g. Black Wallet, ID Card, Umbrella',
-                  inputFill, borderClr, textSub),
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Item name is required' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // ── Description ──────────────────────────────────────────────────
-            _SLabel('Description *', textMain),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _descCtrl,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              style: TextStyle(color: textMain),
-              decoration: _inputDeco(
-                  'Describe the item — color, brand, markings...',
-                  inputFill, borderClr, textSub),
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Description is required' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // ── Location ─────────────────────────────────────────────────────
-            _SLabel('Location *', textMain),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _locCtrl,
-              textCapitalization: TextCapitalization.words,
-              style: TextStyle(color: textMain),
-              decoration: _inputDeco(
-                  isLost ? 'Where did you last see it?' : 'Where did you find it?',
-                  inputFill, borderClr, textSub),
-              validator: (v) => (v == null || v.trim().isEmpty)
-                  ? 'Location is required' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // ── Date ─────────────────────────────────────────────────────────
-            _SLabel(isLost ? 'Date Lost *' : 'Date Found *', textMain),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _pickDate,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: inputFill,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: borderClr),
-                ),
-                child: Row(children: [
-                  Icon(Icons.calendar_today_outlined, size: 18, color: statusColor),
-                  const SizedBox(width: 10),
-                  Text(
-                    _selectedDate != null
-                        ? DateFormat('MMMM d, yyyy').format(_selectedDate!)
-                        : 'Select a date',
-                    style: TextStyle(
-                        color: _selectedDate != null ? textMain : textSub,
-                        fontSize: 14),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 32),
 
-            // ── Submit ───────────────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: statusColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: _isSubmitting
-                    ? const SizedBox(width: 18, height: 18,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                    : Icon(isLost
-                    ? Icons.search_outlined
-                    : Icons.check_circle_outline, size: 20),
-                label: Text(
-                  _isSubmitting
-                      ? 'Submitting...'
-                      : isLost
-                      ? 'Submit Lost Report'
-                      : 'Submit Found Report',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
+                  // Description (optional preview)
+                  if (item.description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      item.description,
+                      style: TextStyle(color: textSub, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+
+                  // Location + date row
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined,
+                          size: 13, color: textSub),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          item.location,
+                          style: TextStyle(color: textSub, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.calendar_today_outlined,
+                          size: 13, color: textSub),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${item.date.month}/${item.date.day}',
+                        style: TextStyle(color: textSub, fontSize: 12),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Contact Owner button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onContactOwner,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: statusColor,
+                        side: BorderSide(color: statusColor),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: Icon(Icons.chat_bubble_outline,
+                          size: 16, color: statusColor),
+                      label: Text(
+                        'Contact Owner',
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-          ]),
+          ],
         ),
       ),
     );
   }
 }
 
-// ── Status toggle button ───────────────────────────────────────────────────────
-class _StatusBtn extends StatelessWidget {
-  final String label, value, current;
-  final Color  color;
-  final ValueChanged<String> onTap;
-  const _StatusBtn(this.label, this.value, this.current, this.color, this.onTap);
+// ── Thumbnail widget ──────────────────────────────────────────────────────────
+class _ItemThumbnail extends StatelessWidget {
+  final String? imageUrl;
+  final bool    hasImage;
+  final Color   statusColor;
+
+  const _ItemThumbnail({
+    required this.imageUrl,
+    required this.hasImage,
+    required this.statusColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final active = current == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onTap(value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          margin: const EdgeInsets.all(3),
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          decoration: BoxDecoration(
-            color: active ? color : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: active ? Colors.white : AppTheme.textSub(context),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14)),
-        ),
+    const size = 80.0;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: hasImage
+            ? Image.network(
+          imageUrl!,
+          fit: BoxFit.cover,
+          // Show a shimmer-style placeholder while loading
+          loadingBuilder: (_, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              color: statusColor.withValues(alpha: 0.08),
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  value: progress.expectedTotalBytes != null
+                      ? progress.cumulativeBytesLoaded /
+                      progress.expectedTotalBytes!
+                      : null,
+                  color: statusColor,
+                ),
+              ),
+            );
+          },
+          // Fall back to placeholder if image fails to load
+          errorBuilder: (_, __, ___) =>
+              _Placeholder(statusColor: statusColor),
+        )
+            : _Placeholder(statusColor: statusColor),
       ),
     );
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-Widget _SLabel(String text, Color color) => Text(text,
-    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color));
+// ── Placeholder (question mark icon) ─────────────────────────────────────────
+class _Placeholder extends StatelessWidget {
+  final Color statusColor;
+  const _Placeholder({required this.statusColor});
 
-InputDecoration _inputDeco(
-    String hint, Color fill, Color border, Color hintClr) =>
-    InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: fill,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: border)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: border)),
-      focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
-      hintStyle: TextStyle(color: hintClr, fontSize: 13),
-    );
+  @override
+  Widget build(BuildContext context) => Container(
+    color: statusColor.withValues(alpha: 0.08),
+    child: Icon(
+      Icons.help_outline_rounded,
+      size: 36,
+      color: statusColor.withValues(alpha: 0.5),
+    ),
+  );
+}

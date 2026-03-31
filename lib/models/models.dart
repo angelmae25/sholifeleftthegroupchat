@@ -231,19 +231,21 @@ class ClubModel {
   final Color color;
   final IconData icon;
   bool isJoined;
+  final String? logoUrl;    // ← NEW
 
   ClubModel({
     required this.id, required this.name, required this.department,
     required this.color, required this.icon, this.isJoined = false,
+    this.logoUrl,           // ← NEW
   });
 
-  // FIX: prefix id with 'org_' so isOrg detection works in ClubsView
   factory ClubModel.fromJson(Map<String, dynamic> json) => ClubModel(
-    id:         'org_${json['id']?.toString() ?? ''}',   // ← KEY FIX
+    id:         'org_${json['id']?.toString() ?? ''}',
     name:       json['name']    as String? ?? '',
     department: json['acronym'] as String? ?? '',
     color:      const Color(0xFF8B1A1A),
     icon:       Icons.groups,
+    logoUrl:    json['logo_url'] as String?,   // ← NEW
   );
 
   static List<ClubModel> get mockList => [
